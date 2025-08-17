@@ -33,7 +33,7 @@ jobs:
   auto-docs:
     runs-on: ubuntu-latest
     # Prevent infinite loops - skip if triggered by the action itself
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'auto-docs[bot]'
     steps:
       - uses: actions/checkout@v5
         with:

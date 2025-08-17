@@ -34,7 +34,7 @@ The project is implemented with 5 main Python modules:
 
 #### Infinite Loop Prevention
 - Commit messages include `[skip ci]` tag
-- Git author set to `github-actions[bot]`
+- Git author set to `auto-docs[bot]`
 - Actor filtering in workflows (when used as action)
 
 ## Final Implementation Status

@@ -139,10 +139,10 @@ def create_commit(message: str) -> bool:
         env = os.environ.copy()
         env.update(
             {
-                "GIT_AUTHOR_NAME": "github-actions[bot]",
-                "GIT_AUTHOR_EMAIL": "41898282+github-actions[bot]@users.noreply.github.com",
-                "GIT_COMMITTER_NAME": "github-actions[bot]",
-                "GIT_COMMITTER_EMAIL": "41898282+github-actions[bot]@users.noreply.github.com",
+                "GIT_AUTHOR_NAME": "auto-docs[bot]",
+                "GIT_AUTHOR_EMAIL": "41898282+auto-docs[bot]@users.noreply.github.com",
+                "GIT_COMMITTER_NAME": "auto-docs[bot]",
+                "GIT_COMMITTER_EMAIL": "41898282+auto-docs[bot]@users.noreply.github.com",
             }
         )
 

@@ -69,14 +69,14 @@ GitHub Action that automatically updates Python docstrings using Claude Code CLI
 - [ ] **Steps**: Install UV → UV sync → Run main.py
 - [ ] **Environment mapping**: INPUT_* variables to script
 - [ ] **Shell**: bash for all steps
-- [ ] **Infinite loop prevention**: Check if commit author is github-actions[bot]
+- [ ] **Infinite loop prevention**: Check if commit author is auto-docs[bot]
 
 ### 7. Infinite Loop Prevention Strategy
 **Problem**: When action commits changes, it triggers itself again
 **Solutions**: Multiple approaches to prevent cycles
 
 - [ ] **Method 1 - Commit Message Detection**: Add `[skip ci]` to commit messages
-- [ ] **Method 2 - Actor Filtering**: Skip if `github.actor == 'github-actions[bot]'`
+- [ ] **Method 2 - Actor Filtering**: Skip if `github.actor == 'auto-docs[bot]'`
 - [ ] **Method 3 - Branch Strategy**: Only run on specific events/branches
 - [ ] **Method 4 - File Change Detection**: Skip if only auto-generated files changed
 - [ ] **Implementation**: Add job-level `if` condition and commit message strategy
