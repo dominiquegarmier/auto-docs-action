@@ -72,8 +72,15 @@ runs:
       run: |
         # Run the action in the target repository directory
         cd $GITHUB_WORKSPACE
+        echo "🔍 Starting auto-docs action..."
         python_output=$(${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main.py 2>&1)
         exit_code=$?
+
+        # Print output for debugging FIRST (regardless of exit code)
+        echo "📋 Python script output:"
+        echo "$python_output"
+        echo ""
+        echo "📊 Python script exit code: $exit_code"
 
         # Extract statistics from output
         files_processed=$(echo "$python_output" | grep -o "total_files': [0-9]*" | grep -o "[0-9]*" || echo "0")
@@ -84,9 +91,6 @@ runs:
         echo "files_processed=$files_processed" >> $GITHUB_OUTPUT
         echo "files_successful=$files_successful" >> $GITHUB_OUTPUT
         echo "files_failed=$files_failed" >> $GITHUB_OUTPUT
-
-        # Print output for debugging
-        echo "$python_output"
 
         # Push changes if there were any successful commits
         if [ $exit_code -eq 0 ] && [ "$files_successful" -gt 0 ]; then

@@ -30,6 +30,13 @@ def main() -> int:
     logger = logging.getLogger(__name__)
 
     try:
+        logger.info("🚀 Auto-docs action starting...")
+        logger.info(f"Python version: {sys.version}")
+        logger.info(f"Working directory: {Path.cwd()}")
+        logger.info("Environment variables:")
+        logger.info(f"  CLAUDE_COMMAND: {os.getenv('CLAUDE_COMMAND', 'NOT SET')}")
+        logger.info(f"  MAX_RETRIES: {os.getenv('MAX_RETRIES', 'NOT SET')}")
+        logger.info(f"  ANTHROPIC_API_KEY: {'SET' if os.getenv('ANTHROPIC_API_KEY') else 'NOT SET'}")
         logger.info("Starting auto-docs GitHub Action")
 
         # Initialize components with environment variables
@@ -43,8 +50,22 @@ def main() -> int:
             retry_delay=retry_delay,
         )
 
+        # Check if we're in a git repository
+        if not Path(".git").exists():
+            logger.error("❌ Not in a git repository!")
+            return 1
+
+        # Check if Claude command is available
+        import shutil
+
+        claude_path = shutil.which(claude_command)
+        if not claude_path:
+            logger.error(f"❌ Claude command '{claude_command}' not found in PATH")
+            return 1
+        logger.info(f"✅ Claude command found at: {claude_path}")
+
         # Get changed Python files from git
-        logger.info("Detecting changed Python files...")
+        logger.info("🔍 Detecting changed Python files...")
         changed_files = git_operations.get_changed_py_files()
 
         if not changed_files:
