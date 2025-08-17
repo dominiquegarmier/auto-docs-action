@@ -118,8 +118,8 @@ def _execute_claude_cli(prompt: str, file_path: Path, claude_command: str) -> Do
         DocstringUpdateResult with CLI execution outcome
     """
     try:
-        # Build Claude Code CLI command for file editing with verbose output
-        cmd = [claude_command, "--verbose", prompt]
+        # Build Claude Code CLI command with explicit permission to use Edit tool
+        cmd = [claude_command, "--verbose", "--allowedTools", "Edit", prompt]
 
         logging.info(f"Executing Claude Code CLI edit tool for {file_path}")
         logging.debug(f"Command: {' '.join(cmd)}")
