@@ -1,13 +1,36 @@
-"""Module for updating Python docstrings using Claude Code CLI."""
+"""Module for updating Python docstrings using Claude Code CLI edit tool."""
 
 from __future__ import annotations
 
-import json
 import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+
+import git_operations
+
+# Prompt template for docstring updates using Claude Code CLI edit tool
+DOCSTRING_UPDATE_PROMPT_TEMPLATE = """Based on the git diff below, please add or improve Google-style docstrings \
+for the functions/classes that were changed in {file_path}.
+
+Git diff showing what changed:
+```
+{git_diff}
+```
+
+Requirements:
+1. Only edit the file {file_path} - focus on the changed functions/classes shown in the diff
+2. Follow Google-style docstring conventions exactly
+3. Include Args, Returns, and Raises sections as appropriate
+4. Add comprehensive type information in docstrings that complements type hints
+5. CRITICAL: Do not modify function signatures, imports, or any logic - ONLY add/improve docstrings
+6. If a function already has a complete Google-style docstring, leave it unchanged
+7. For functions without docstrings that were changed, add complete Google-style docstrings
+8. For functions with incomplete docstrings that were changed, improve them to full Google-style format
+9. Focus only on the areas that changed according to the git diff
+
+Use the Edit tool to make the changes directly to {file_path}. Focus on improving documentation quality \
+for the changed code while preserving all existing functionality."""
 
 
 @dataclass
@@ -17,177 +40,107 @@ class DocstringUpdateResult:
     success: bool
     updated_content: str | None = None
     error_message: str | None = None
-    claude_response: dict[str, Any] | None = None
 
 
-class DocstringUpdater:
-    """Updates Python docstrings using Claude Code CLI."""
+def update_docstrings(file_path: Path, claude_command: str = "claude") -> DocstringUpdateResult:
+    """Update docstrings in a Python file using Claude Code CLI edit tool.
 
-    def __init__(self, claude_command: str = "claude"):
-        """Initialize the docstring updater.
+    Args:
+        file_path: Path to the Python file to update
+        claude_command: Command to execute Claude Code CLI (default: "claude")
 
-        Args:
-            claude_command: Command to execute Claude Code CLI (default: "claude")
-        """
-        self.claude_command = claude_command
+    Returns:
+        DocstringUpdateResult with the operation outcome
+    """
+    try:
+        # Store original content to detect changes
+        original_content = file_path.read_text()
 
-    def update_docstrings(self, file_path: Path) -> DocstringUpdateResult:
-        """Update docstrings in a Python file using Claude Code CLI.
+        # Get git diff for the file to understand what changed
+        git_diff = git_operations.get_file_diff(file_path)
 
-        Args:
-            file_path: Path to the Python file to update
+        # If no diff available, skip processing (no changes to analyze)
+        if not git_diff.strip():
+            logging.info(f"No git diff available for {file_path}, skipping docstring updates")
+            return DocstringUpdateResult(success=True, updated_content=None)
 
-        Returns:
-            DocstringUpdateResult with the operation outcome
-        """
-        try:
-            # Prepare the prompt for Claude Code CLI
-            prompt = self._create_docstring_prompt(file_path)
+        # Create prompt for Claude Code CLI with diff context
+        prompt = _create_docstring_prompt(file_path, git_diff)
 
-            # Execute Claude Code CLI
-            result = self._execute_claude_cli(prompt, file_path)
+        # Execute Claude Code CLI with edit tool functionality
+        result = _execute_claude_cli(prompt, file_path, claude_command)
 
-            if result.success and result.claude_response:
-                # Parse Claude's response and extract updated content
-                updated_content = self._extract_updated_content(result.claude_response)
-                if updated_content:
-                    return DocstringUpdateResult(
-                        success=True, updated_content=updated_content, claude_response=result.claude_response
-                    )
-                else:
-                    return DocstringUpdateResult(
-                        success=False,
-                        error_message="Could not extract updated content from Claude response",
-                        claude_response=result.claude_response,
-                    )
-            else:
-                return result
-
-        except Exception as e:
-            logging.error(f"Error updating docstrings for {file_path}: {e}")
-            return DocstringUpdateResult(success=False, error_message=f"Unexpected error: {e}")
-
-    def _create_docstring_prompt(self, file_path: Path) -> str:
-        """Create a prompt for Claude Code CLI to update docstrings.
-
-        Args:
-            file_path: Path to the Python file
-
-        Returns:
-            Formatted prompt string for Claude Code CLI
-        """
-        return f"""Please add or improve Google-style docstrings for all functions and classes in the Python file: {file_path}
-
-Requirements:
-1. Follow Google-style docstring conventions
-2. Include Args, Returns, and Raises sections as appropriate
-3. Add type information in docstrings that complements type hints
-4. Ensure docstrings are clear, concise, and helpful
-5. Do not modify function signatures, imports, or logic - ONLY add/improve docstrings
-6. If a function already has a good docstring, leave it unchanged
-7. Return the complete updated file content
-
-The goal is to improve code documentation while maintaining all existing functionality."""
-
-    def _execute_claude_cli(self, prompt: str, file_path: Path) -> DocstringUpdateResult:
-        """Execute Claude Code CLI with the given prompt.
-
-        Args:
-            prompt: Prompt to send to Claude Code CLI
-            file_path: Path to the file being processed
-
-        Returns:
-            DocstringUpdateResult with CLI execution outcome
-        """
-        try:
-            # Build Claude Code CLI command
-            cmd = [self.claude_command, "-p", prompt, "--output-format", "json", "--max-turns", "3"]
-
-            logging.info(f"Executing Claude Code CLI for {file_path}")
-            logging.debug(f"Command: {' '.join(cmd)}")
-
-            # Execute the command
-            result = subprocess.run(cmd, cwd=file_path.parent, capture_output=True, text=True, timeout=300)  # 5 minute timeout
-
-            if result.returncode != 0:
-                error_msg = f"Claude Code CLI failed with return code {result.returncode}"
-                if result.stderr:
-                    error_msg += f": {result.stderr.strip()}"
-
-                logging.error(error_msg)
-                return DocstringUpdateResult(success=False, error_message=error_msg)
-
-            # Parse JSON response
+        if result.success:
+            # Check if file was modified by comparing content
             try:
-                claude_response = json.loads(result.stdout)
-                return DocstringUpdateResult(success=True, claude_response=claude_response)
-            except json.JSONDecodeError as e:
-                logging.error(f"Failed to parse Claude Code CLI JSON response: {e}")
-                logging.debug(f"Raw output: {result.stdout}")
-                return DocstringUpdateResult(success=False, error_message=f"Invalid JSON response from Claude Code CLI: {e}")
+                current_content = file_path.read_text()
+                if current_content != original_content:
+                    # File was modified by Claude
+                    return DocstringUpdateResult(success=True, updated_content=current_content)
+                else:
+                    # No changes were made
+                    return DocstringUpdateResult(success=True, updated_content=None)
+            except Exception as e:
+                logging.error(f"Error reading updated file {file_path}: {e}")
+                return DocstringUpdateResult(success=False, error_message=f"Failed to read updated file: {e}")
+        else:
+            return result
 
-        except subprocess.TimeoutExpired:
-            logging.error(f"Claude Code CLI timed out for {file_path}")
-            return DocstringUpdateResult(success=False, error_message="Claude Code CLI operation timed out")
-        except Exception as e:
-            logging.error(f"Error executing Claude Code CLI: {e}")
-            return DocstringUpdateResult(success=False, error_message=f"CLI execution error: {e}")
+    except Exception as e:
+        logging.error(f"Error updating docstrings for {file_path}: {e}")
+        return DocstringUpdateResult(success=False, error_message=f"Unexpected error: {e}")
 
-    def _extract_updated_content(self, claude_response: dict[str, Any]) -> str | None:
-        """Extract updated file content from Claude Code CLI response.
 
-        Args:
-            claude_response: Parsed JSON response from Claude Code CLI
+def _create_docstring_prompt(file_path: Path, git_diff: str) -> str:
+    """Create a prompt for Claude Code CLI to update docstrings.
 
-        Returns:
-            Updated file content or None if extraction failed
-        """
-        try:
-            # The exact structure of Claude Code CLI JSON response may vary
-            # This implementation assumes a common structure, but may need adjustment
+    Args:
+        file_path: Path to the Python file being processed
+        git_diff: Git diff showing what changed in the file
 
-            # Check if response contains file modifications
-            if "modifications" in claude_response:
-                modifications = claude_response["modifications"]
-                if modifications and len(modifications) > 0:
-                    # Assume first modification contains the updated content
-                    first_mod = modifications[0]
-                    if "content" in first_mod:
-                        content = first_mod["content"]
-                        return content if isinstance(content, str) else None
+    Returns:
+        Formatted prompt string for Claude Code CLI
+    """
+    return DOCSTRING_UPDATE_PROMPT_TEMPLATE.format(file_path=file_path, git_diff=git_diff)
 
-            # Alternative: check for direct content field
-            if "content" in claude_response:
-                content = claude_response["content"]
-                return content if isinstance(content, str) else None
 
-            # Alternative: check for messages with code blocks
-            if "messages" in claude_response:
-                for message in claude_response["messages"]:
-                    if "content" in message and isinstance(message["content"], str):
-                        # Look for code blocks or full file content
-                        content = message["content"]
-                        if "```python" in content:
-                            # Extract Python code block
-                            lines = content.split("\n")
-                            in_code_block = False
-                            code_lines = []
-                            for line in lines:
-                                if line.strip().startswith("```python"):
-                                    in_code_block = True
-                                    continue
-                                elif line.strip() == "```" and in_code_block:
-                                    break
-                                elif in_code_block:
-                                    code_lines.append(line)
+def _execute_claude_cli(prompt: str, file_path: Path, claude_command: str) -> DocstringUpdateResult:
+    """Execute Claude Code CLI with the given prompt using edit tool functionality.
 
-                            if code_lines:
-                                return "\n".join(code_lines)
+    Args:
+        prompt: Prompt to send to Claude Code CLI
+        file_path: Path to the file being processed
+        claude_command: Command to execute Claude Code CLI
 
-            logging.warning("Could not extract content from Claude response structure")
-            logging.debug(f"Response structure: {claude_response.keys()}")
-            return None
+    Returns:
+        DocstringUpdateResult with CLI execution outcome
+    """
+    try:
+        # Build Claude Code CLI command for file editing
+        cmd = [claude_command, prompt]
 
-        except Exception as e:
-            logging.error(f"Error extracting content from Claude response: {e}")
-            return None
+        logging.info(f"Executing Claude Code CLI edit tool for {file_path}")
+        logging.debug(f"Command: {' '.join(cmd)}")
+
+        # Execute the command in the file's directory so Claude can access the file
+        result = subprocess.run(cmd, cwd=file_path.parent, capture_output=True, text=True, timeout=300)  # 5 minute timeout
+
+        if result.returncode != 0:
+            error_msg = f"Claude Code CLI failed with return code {result.returncode}"
+            if result.stderr:
+                error_msg += f": {result.stderr.strip()}"
+
+            logging.error(error_msg)
+            return DocstringUpdateResult(success=False, error_message=error_msg)
+
+        # With edit tool approach, Claude modifies the file directly
+        # Success is indicated by return code 0
+        logging.info(f"Claude Code CLI completed successfully for {file_path}")
+        return DocstringUpdateResult(success=True)
+
+    except subprocess.TimeoutExpired:
+        logging.error(f"Claude Code CLI timed out for {file_path}")
+        return DocstringUpdateResult(success=False, error_message="Claude Code CLI operation timed out")
+    except Exception as e:
+        logging.error(f"Error executing Claude Code CLI: {e}")
+        return DocstringUpdateResult(success=False, error_message=f"CLI execution error: {e}")

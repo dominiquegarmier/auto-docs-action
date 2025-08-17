@@ -8,7 +8,8 @@
       "Bash(uv run mypy:*)",
       "Bash(uv run black:*)",
       "Bash(uv run isort:*)",
-      "Bash(uv run:*)"
+      "Bash(uv run:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

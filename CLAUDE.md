@@ -42,19 +42,28 @@ This is a UV-managed Python project:
 
 The project uses UV for dependency management. Install with `uv sync --dev` before development.
 
+### Quality Assurance - CRITICAL: Always run after changes
+**MANDATORY**: After making ANY code changes, always run these quality checks:
+```bash
+uv run pytest                    # All tests must pass (61 tests currently)
+uv run mypy .                    # Type checking must be clean
+uv run pre-commit run --all-files # All quality checks must pass
+```
+
 ### Key Implementation Details
-- **Git Operations**: Use subprocess calls (following pre-commit pattern), not GitPython
-- **Claude Code CLI**: `claude -p <prompt> --output-format json --max-turns 3`
+- **Git Operations**: Standalone functions using subprocess calls (following pre-commit pattern)
+- **Claude Code CLI**: Uses edit tool functionality with git diff context: `claude <prompt>`
 - **AST Validation**: Mathematical proof that only docstrings changed
 - **Retry Logic**: Max 2 attempts per file, using `git restore` to clean state between attempts
 - **Testing**: Real functionality with minimal mocking (only mock Claude Code CLI calls)
 
 ### Code Standards
-- Use type hints throughout the codebase (`from __future__ import annotations`)
+- Use modern Python 3.12 type hints: `list[T]`, `dict[K,V]`, `X | Y` (not `List`, `Dict`, `Union`)
 - Follow Google-style docstrings for all functions and classes
 - Use dataclasses for structured return types
 - Implement comprehensive logging for debugging and monitoring
-- Pre-commit hooks: black, flake8, isort, mypy
+- Pre-commit hooks: black (127 char lines), flake8, isort, mypy
+- Functions over classes where possible (git operations are now standalone functions)
 
 ## Documentation Management
 

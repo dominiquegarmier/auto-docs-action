@@ -8,11 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ast_validator import ASTValidator
+import ast_validator
+import docstring_updater
 from ast_validator import ValidationResult
-from docstring_updater import DocstringUpdater
 from docstring_updater import DocstringUpdateResult
-from git_operations import GitOperations
 
 
 @dataclass
@@ -33,24 +32,18 @@ class FileProcessor:
 
     def __init__(
         self,
-        git_ops: GitOperations | None = None,
-        docstring_updater: DocstringUpdater | None = None,
-        ast_validator: ASTValidator | None = None,
+        claude_command: str = "claude",
         max_retries: int = 3,
         retry_delay: float = 1.0,
     ):
         """Initialize the file processor.
 
         Args:
-            git_ops: Git operations handler (default: create new instance)
-            docstring_updater: Docstring updater (default: create new instance)
-            ast_validator: AST validator (default: create new instance)
+            claude_command: Command to execute Claude Code CLI (default: "claude")
             max_retries: Maximum number of retry attempts (default: 3)
             retry_delay: Delay between retries in seconds (default: 1.0)
         """
-        self.git_ops = git_ops or GitOperations()
-        self.docstring_updater = docstring_updater or DocstringUpdater()
-        self.ast_validator = ast_validator or ASTValidator()
+        self.claude_command = claude_command
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 
@@ -130,7 +123,7 @@ class FileProcessor:
         logging.debug(f"Attempting to process {file_path} (attempt {attempt + 1})")
 
         # Step 1: Update docstrings using Claude Code CLI
-        update_result = self.docstring_updater.update_docstrings(file_path)
+        update_result = docstring_updater.update_docstrings(file_path, self.claude_command)
 
         if not update_result.success:
             logging.warning(f"Docstring update failed for {file_path}: {update_result.error_message}")
@@ -163,7 +156,7 @@ class FileProcessor:
             )
 
         # Step 3: Validate that only docstrings were changed
-        validation_result = self.ast_validator.validate_changes(original_content, file_path)
+        validation_result = ast_validator.validate_changes(original_content, file_path)
 
         if not validation_result.passed:
             logging.warning(f"AST validation failed for {file_path}: {validation_result.reason}")

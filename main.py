@@ -7,10 +7,8 @@ import os
 import sys
 from pathlib import Path
 
-from ast_validator import ASTValidator
-from docstring_updater import DocstringUpdater
+import git_operations
 from file_processor import FileProcessor
-from git_operations import GitOperations
 
 
 def setup_logging() -> None:
@@ -39,20 +37,15 @@ def main() -> int:
         max_retries = int(os.getenv("MAX_RETRIES", "3"))
         retry_delay = float(os.getenv("RETRY_DELAY", "1.0"))
 
-        git_ops = GitOperations()
-        docstring_updater = DocstringUpdater(claude_command=claude_command)
-        ast_validator = ASTValidator()
         processor = FileProcessor(
-            git_ops=git_ops,
-            docstring_updater=docstring_updater,
-            ast_validator=ast_validator,
+            claude_command=claude_command,
             max_retries=max_retries,
             retry_delay=retry_delay,
         )
 
         # Get changed Python files from git
         logger.info("Detecting changed Python files...")
-        changed_files = git_ops.get_changed_py_files()
+        changed_files = git_operations.get_changed_py_files()
 
         if not changed_files:
             logger.info("No Python files changed. Nothing to do.")
@@ -75,13 +68,13 @@ def main() -> int:
         for result in results:
             if result.success and result.changes_made:
                 logger.info(f"Staging changes for {result.file_path}")
-                if git_ops.stage_file(result.file_path):
+                if git_operations.stage_file(result.file_path):
                     staged_any = True
                 else:
                     logger.error(f"Failed to stage {result.file_path}")
 
         # Create commit if we have staged changes
-        if staged_any and git_ops.has_staged_files():
+        if staged_any and git_operations.has_staged_files():
             commit_message = (
                 f"docs: auto-update docstrings\n\n" f"Updated docstrings for {stats['files_with_changes']} files:\n"
             )
@@ -91,7 +84,7 @@ def main() -> int:
                     docstring_count = len(result.validation_result.docstring_changes or [])
                     commit_message += f"- {result.file_path.name}: {docstring_count} docstring changes\n"
 
-            if git_ops.create_commit(commit_message):
+            if git_operations.create_commit(commit_message):
                 logger.info("Successfully created commit with docstring updates")
             else:
                 logger.error("Failed to create commit")
