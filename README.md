@@ -1,65 +1,74 @@
 # Auto-Docs Action
 
-[![Test Suite](https://github.com/dominiquegarmier/auto-docs-action/workflows/Test%20Suite/badge.svg)](https://github.com/dominiquegarmier/auto-docs-action/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Automatically update Python docstrings using Claude Code CLI. This GitHub Action detects changed Python files and adds comprehensive Google-style docstrings to functions, classes, and methods that lack proper documentation.
 
-GitHub Action that automatically updates Python docstrings using Claude Code CLI. When Python files are modified, this action uses AI to add or improve Google-style docstrings while ensuring no logic changes through AST validation.
+## Features
 
-## ✨ Features
+- **🔍 Smart Detection**: Only processes files that have changed since the last auto-docs commit
+- **🤖 AI-Powered**: Uses Claude Code CLI to generate high-quality, context-aware docstrings
+- **✅ Safe Updates**: AST validation ensures only docstrings are modified, never function logic
+- **🔄 Retry Logic**: Automatic retries with file restoration for reliability
+- **📊 Real-time Logs**: See processing progress live in GitHub Actions
+- **🔀 Multi-file Support**: Processes multiple files concurrently with proper error handling
 
-- 🤖 **AI-Powered**: Uses Claude Code CLI to generate high-quality docstrings
-- 🔒 **Safe**: AST validation ensures only docstrings are modified, never logic
-- 🔄 **Reliable**: Retry logic with `git restore` for clean failure recovery
-- 📝 **Google Style**: Enforces Google-style docstring format
-- ⚡ **Efficient**: Only processes files that actually changed
-- 🪵 **Transparent**: Rich logging shows exactly what was modified
+## Quick Start
 
-## 🚀 Usage
-
-Add this to your `.github/workflows/auto-docs.yml`:
+Add this workflow to your repository at `.github/workflows/auto-docs.yml`:
 
 ```yaml
-name: Auto-update docstrings
+name: Auto-Docs
 
 on:
   push:
     branches: [ main ]
-    paths: [ '**.py' ]  # Only run when Python files change
+    paths: [ '**.py' ]
+  workflow_dispatch: # Allow manual triggering
+
+# Cancel older runs if new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-  contents: write  # Required to push commits
+  contents: write
 
 jobs:
   auto-docs:
     runs-on: ubuntu-latest
-    # Prevent infinite loops - skip if triggered by the action itself
-    if: github.actor != 'auto-docs[bot]'
+    if: github.actor != 'github-actions[bot]'
+
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 32  # Need history for git diff
 
-      - name: Update docstrings
-        uses: dominiquegarmier/auto-docs-action@v1
+      - name: Auto-update docstrings
+        uses: dominiquegarmier/auto-docs-action@main
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           max_retries: 2
 ```
 
-### Required Setup
+## Setup
 
-1. **Get an Anthropic API key** from [console.anthropic.com](https://console.anthropic.com)
-2. **Add it as a repository secret** named `ANTHROPIC_API_KEY`
-3. **Ensure workflow has write permissions** to push commits
+1. **Get Anthropic API Key**: Sign up at [console.anthropic.com](https://console.anthropic.com) and create an API key
+2. **Add Secret**: Go to your repository Settings → Secrets and variables → Actions, and add `ANTHROPIC_API_KEY`
+3. **Add Workflow**: Create the workflow file above in your repository
+4. **Push Changes**: The action will trigger on Python file changes
 
-### Action Inputs
+## Configuration
 
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `anthropic_api_key` | ✅ | | Your Anthropic API key for Claude Code |
-| `max_retries` | | `2` | Maximum retry attempts per file |
+### Inputs
 
-### Action Outputs
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `anthropic_api_key` | Your Anthropic API key for Claude Code | Yes | - |
+| `max_retries` | Maximum retry attempts per file | No | `2` |
+| `claude_command` | Path to Claude Code CLI executable | No | `claude` |
+
+### Outputs
 
 | Output | Description |
 |--------|-------------|
@@ -67,147 +76,67 @@ jobs:
 | `files_successful` | Number of files successfully updated |
 | `files_failed` | Number of files that failed processing |
 
-## 🔧 How It Works
+## How It Works
 
-1. **Detects Changes**: Finds Python files modified in the latest commit
-2. **AI Processing**: For each file, Claude Code analyzes and adds missing docstrings
-3. **Safety Validation**: AST comparison ensures only docstrings were changed
-4. **Retry Logic**: If validation fails, restores file and retries (up to max_retries)
-5. **Commit Changes**: Creates a clean commit with all successfully updated files
+1. **Detection**: Identifies Python files changed since the last `github-actions[bot]` commit
+2. **Analysis**: For each file, generates a git diff to understand what changed
+3. **Processing**: Sends files to Claude Code CLI with context-aware prompts
+4. **Validation**: Uses AST parsing to ensure only docstrings were modified
+5. **Commit**: Creates a commit with updated docstrings and pushes back to the repository
 
-```mermaid
-flowchart TD
-    A[Git Diff] --> B[Changed .py Files]
-    B --> C[For Each File]
-    C --> D[Call Claude Code]
-    D --> E[AST Validation]
-    E -->|Pass| F[Stage File]
-    E -->|Fail| G[Git Restore + Retry]
-    G --> D
-    F --> H[Create Commit]
-    G -->|Max Retries| I[Log Failure]
-```
+### First Run
 
-## 🛡️ Safety Guarantees
+On the first run (no previous auto-docs commits), the action processes all Python files in the repository to establish a baseline of documented code.
 
-- **AST Validation**: Mathematical proof that only docstrings changed
-- **No Logic Modifications**: Function signatures, imports, and code logic remain untouched
-- **Rollback on Failure**: `git restore` ensures clean state between retry attempts
-- **Audit Trail**: Complete logging of all operations and changes
+### Smart Diff Detection
 
-## 🧪 Example
+The action uses intelligent diff detection:
+- Compares against the last commit made by `github-actions[bot]`
+- Handles multiple commits between auto-docs runs
+- Prevents processing unchanged files for efficiency
 
-**Before** (missing docstrings):
+## Example Output
+
+The action generates comprehensive Google-style docstrings:
+
 ```python
-def calculate_area(length, width):
-    return length * width
+# Before
+def calculate_total(items, tax_rate):
+    return sum(items) * (1 + tax_rate)
 
-class Rectangle:
-    def __init__(self, length, width):
-        self.length = length
-        self.width = width
-```
-
-**After** (docstrings added):
-```python
-def calculate_area(length, width):
-    """Calculate the area of a rectangle.
+# After
+def calculate_total(items, tax_rate):
+    """Calculate the total cost including tax for a list of items.
 
     Args:
-        length: The length of the rectangle.
-        width: The width of the rectangle.
+        items: List of item prices as numeric values.
+        tax_rate: Tax rate as a decimal (e.g., 0.1 for 10% tax).
 
     Returns:
-        The area of the rectangle.
+        The total cost including tax as a float.
     """
-    return length * width
-
-class Rectangle:
-    """A rectangle class for geometric calculations."""
-
-    def __init__(self, length, width):
-        """Initialize a rectangle.
-
-        Args:
-            length: The length of the rectangle.
-            width: The width of the rectangle.
-        """
-        self.length = length
-        self.width = width
+    return sum(items) * (1 + tax_rate)
 ```
 
-## 🏗️ Development
+## Safety & Validation
 
-This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+- **AST Validation**: Mathematically proves only docstrings were changed
+- **Syntax Checking**: Ensures all modifications result in valid Python
+- **File Restoration**: Automatically restores files if validation fails
+- **Retry Logic**: Up to 3 attempts per file with clean state between tries
+- **Race Condition Protection**: Checks for concurrent commits before pushing
 
-```bash
-# Install dependencies
-uv sync --dev
+## Limitations
 
-# Run tests
-uv run pytest
+- Requires Anthropic API key (Claude usage costs apply)
+- Only processes Python files (`.py` extension)
+- Designed for Google-style docstrings
+- Requires `contents: write` permission for commits
 
-# Run with coverage
-uv run pytest --cov=.
+## Contributing
 
-# Code quality checks
-uv run pre-commit run --all-files
-```
+Issues and pull requests are welcome! Please ensure all tests pass and follow the existing code style.
 
-### Project Structure
+## License
 
-```
-├── main.py                     # Entry point
-├── git_operations.py           # Git commands via subprocess (function-based)
-├── ast_validator.py            # AST-based safety validation (function-based)
-├── docstring_updater.py        # Claude Code CLI interface (function-based)
-├── file_processor.py           # Retry logic orchestrator (class-based)
-├── action.yml                  # GitHub Action configuration
-└── tests/                      # Comprehensive test suite (function-based tests)
-```
-
-## 📖 Documentation
-
-- [TODO.md](TODO.md) - Implementation tasks and progress
-- [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) - Architecture and design decisions
-- [TESTING_STRATEGY.md](TESTING_STRATEGY.md) - Testing approach and examples
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes and add tests
-4. Ensure tests pass (`uv run pytest`)
-5. Run pre-commit hooks (`uv run pre-commit run --all-files`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ❓ Troubleshooting
-
-### "No API key provided"
-Make sure you've added `ANTHROPIC_API_KEY` to your repository secrets.
-
-### "Permission denied"
-Ensure your workflow has write permissions to push commits:
-```yaml
-permissions:
-  contents: write
-```
-
-### "Claude Code not found"
-The action automatically installs Claude Code CLI. If you see this error, please file an issue.
-
-### Files not being processed
-Check that:
-- Python files were actually modified in the latest commit
-- Files have valid Python syntax
-- The workflow is triggered on the correct events
-
----
-
-Built with ❤️ using [Claude Code](https://claude.ai/code)
+MIT License - see [LICENSE](LICENSE) file for details.
