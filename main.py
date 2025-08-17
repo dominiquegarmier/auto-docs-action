@@ -105,7 +105,7 @@ def main() -> int:
                     docstring_count = len(result.validation_result.docstring_changes or [])
                     commit_message += f"- {result.file_path.name}: {docstring_count} docstring changes\n"
 
-            commit_message += "\nCo-authored-by: auto-docs[bot] <auto-docs[bot]@users.noreply.github.com>"
+            commit_message += "\nCo-authored-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
 
             if git_operations.create_commit(commit_message):
                 logger.info("Successfully created commit with docstring updates")

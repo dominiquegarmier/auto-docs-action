@@ -45,10 +45,10 @@ class Calculator:
             os.system("git add test_module.py")
             os.system("git commit -m 'Add subtract function'")
 
-            # Create an auto-docs commit first so diff logic works
+            # Create a github-actions commit first so diff logic works
             os.system(
-                'git -c user.name="auto-docs[bot]" -c user.email="auto-docs@users.noreply.github.com" '
-                'commit --allow-empty -m "Auto-docs commit"'
+                'git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" '
+                'commit --allow-empty -m "GitHub Actions commit"'
             )
 
             # Add another change after auto-docs commit so there's something to diff
@@ -159,10 +159,10 @@ def test_workflow_with_validation_failure():
             os.system("git add test_module.py")
             os.system("git commit -m 'Initial commit'")
 
-            # Create an auto-docs commit first so diff logic works
+            # Create a github-actions commit first so diff logic works
             os.system(
-                'git -c user.name="auto-docs[bot]" -c user.email="auto-docs@users.noreply.github.com" '
-                'commit --allow-empty -m "Auto-docs commit"'
+                'git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" '
+                'commit --allow-empty -m "GitHub Actions commit"'
             )
 
             # Modify file

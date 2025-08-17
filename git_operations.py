@@ -48,48 +48,48 @@ def cmd_output(*cmd: str, cwd: str | None = None, check: bool = True, timeout: i
 
 
 def get_last_auto_docs_commit() -> str | None:
-    """Get the SHA of the last commit made by auto-docs[bot].
+    """Get the SHA of the last commit made by github-actions[bot] for auto-docs.
 
     Returns:
         The commit SHA if found, None if no auto-docs commits exist
     """
     try:
         # Try multiple author patterns to be robust
-        patterns = ["auto-docs[bot]", "auto-docs\\[bot\\]", "*auto-docs*"]
+        patterns = ["github-actions[bot]", "github-actions\\[bot\\]", "*github-actions*"]
 
         for pattern in patterns:
             try:
                 _, stdout, _ = cmd_output("git", "log", f"--author={pattern}", "--format=%H", "-1")
                 commit_sha = stdout.strip()
                 if commit_sha:
-                    logging.debug(f"Found last auto-docs commit: {commit_sha[:8]} with pattern: {pattern}")
+                    logging.debug(f"Found last github-actions commit: {commit_sha[:8]} with pattern: {pattern}")
                     return commit_sha
             except CalledProcessError:
                 continue
 
-        logging.debug("No auto-docs commits found in history")
+        logging.debug("No github-actions commits found in history")
         return None
     except CalledProcessError:
-        logging.debug("No previous auto-docs commits found or git error")
+        logging.debug("No previous github-actions commits found or git error")
         return None
 
 
 def get_changed_py_files() -> list[Path]:
-    """Get list of Python files changed since the last auto-docs[bot] commit.
+    """Get list of Python files changed since the last github-actions[bot] commit.
 
-    If no auto-docs commits exist, returns ALL Python files in the repository.
+    If no github-actions commits exist, returns ALL Python files in the repository.
 
     Returns:
         List of Path objects for changed .py files that exist
     """
     try:
-        # Find the last auto-docs commit
+        # Find the last github-actions commit
         last_auto_docs = get_last_auto_docs_commit()
 
         if last_auto_docs:
-            # Diff from last auto-docs commit to HEAD
+            # Diff from last github-actions commit to HEAD
             _, stdout, _ = cmd_output("git", "diff", "--name-only", last_auto_docs, "HEAD")
-            logging.info(f"Comparing against last auto-docs commit: {last_auto_docs[:8]}")
+            logging.info(f"Comparing against last github-actions commit: {last_auto_docs[:8]}")
 
             py_files = []
             for line in stdout.strip().split("\n"):
@@ -98,7 +98,7 @@ def get_changed_py_files() -> list[Path]:
         else:
             # Fallback: get ALL Python files in the repository (first run)
             _, stdout, _ = cmd_output("git", "ls-files", "*.py")
-            logging.info("No previous auto-docs commits found, processing all Python files")
+            logging.info("No previous github-actions commits found, processing all Python files")
 
             py_files = []
             for line in stdout.strip().split("\n"):
@@ -114,9 +114,9 @@ def get_changed_py_files() -> list[Path]:
 
 
 def get_file_diff(file_path: Path) -> str:
-    """Get git diff for specific file since the last auto-docs[bot] commit.
+    """Get git diff for specific file since the last github-actions[bot] commit.
 
-    If no auto-docs commits exist, returns diff from first commit to HEAD.
+    If no github-actions commits exist, returns diff from first commit to HEAD.
 
     Args:
         file_path: Path to the file to get diff for
@@ -125,15 +125,15 @@ def get_file_diff(file_path: Path) -> str:
         Git diff output as string, empty string if error
     """
     try:
-        # Find the last auto-docs commit
+        # Find the last github-actions commit
         last_auto_docs = get_last_auto_docs_commit()
 
         if last_auto_docs:
-            # Diff from last auto-docs commit to HEAD
+            # Diff from last github-actions commit to HEAD
             _, stdout, _ = cmd_output("git", "diff", last_auto_docs, "HEAD", str(file_path))
             return stdout
         else:
-            # No auto-docs history - diff from first commit to HEAD
+            # No github-actions history - diff from first commit to HEAD
             try:
                 # Get the first commit in the repository
                 _, first_commit, _ = cmd_output("git", "rev-list", "--max-parents=0", "HEAD")
@@ -141,7 +141,7 @@ def get_file_diff(file_path: Path) -> str:
 
                 # Diff from first commit to HEAD for this file
                 _, stdout, _ = cmd_output("git", "diff", first_commit, "HEAD", str(file_path))
-                logging.debug(f"No auto-docs history, showing full diff for {file_path} from first commit")
+                logging.debug(f"No github-actions history, showing full diff for {file_path} from first commit")
                 return stdout
             except CalledProcessError:
                 # Fallback: if we can't find first commit, show the entire file as added
@@ -213,10 +213,10 @@ def create_commit(message: str) -> bool:
         env = os.environ.copy()
         env.update(
             {
-                "GIT_AUTHOR_NAME": "auto-docs[bot]",
-                "GIT_AUTHOR_EMAIL": "41898282+auto-docs[bot]@users.noreply.github.com",
-                "GIT_COMMITTER_NAME": "auto-docs[bot]",
-                "GIT_COMMITTER_EMAIL": "41898282+auto-docs[bot]@users.noreply.github.com",
+                "GIT_AUTHOR_NAME": "github-actions[bot]",
+                "GIT_AUTHOR_EMAIL": "41898282+github-actions[bot]@users.noreply.github.com",
+                "GIT_COMMITTER_NAME": "github-actions[bot]",
+                "GIT_COMMITTER_EMAIL": "41898282+github-actions[bot]@users.noreply.github.com",
             }
         )
 

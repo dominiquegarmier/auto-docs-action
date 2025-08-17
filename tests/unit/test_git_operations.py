@@ -56,7 +56,7 @@ def test_get_changed_py_files_empty_repo(temp_git_repo: Path, monkeypatch):
 
 
 def test_get_changed_py_files_with_changes(git_repo_with_files: Path, monkeypatch):
-    """Test detection of changed Python files (returns all files when no auto-docs history)."""
+    """Test detection of changed Python files (returns all files when no github-actions history)."""
 
     # Modify a Python file
     py_file = git_repo_with_files / "good_docstrings.py"
@@ -67,7 +67,7 @@ def test_get_changed_py_files_with_changes(git_repo_with_files: Path, monkeypatc
     subprocess.run(["git", "add", str(py_file)], cwd=git_repo_with_files, check=True)
     subprocess.run(["git", "commit", "-m", "Modify Python file"], cwd=git_repo_with_files, check=True)
 
-    # Test our function - should return ALL Python files since no auto-docs history
+    # Test our function - should return ALL Python files since no github-actions history
     with monkeypatch.context() as m:
         m.chdir(git_repo_with_files)
         changed_files = git_operations.get_changed_py_files()
@@ -78,7 +78,7 @@ def test_get_changed_py_files_with_changes(git_repo_with_files: Path, monkeypatc
 
 
 def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeypatch):
-    """Test that only .py files are returned (all files when no auto-docs history)."""
+    """Test that only .py files are returned (all files when no github-actions history)."""
 
     # Create and modify non-Python files
     txt_file = git_repo_with_files / "readme.txt"
@@ -96,7 +96,7 @@ def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeyp
         m.chdir(git_repo_with_files)
         changed_files = git_operations.get_changed_py_files()
 
-    # Should return ALL Python files (no auto-docs history), excluding .txt files
+    # Should return ALL Python files (no github-actions history), excluding .txt files
     assert len(changed_files) == 4  # All Python files in repo
     file_names = {f.name for f in changed_files}
     assert file_names == {"good_docstrings.py", "missing_docstrings.py", "mixed_quality.py", "syntax_error.py"}
@@ -104,7 +104,7 @@ def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeyp
 
 
 def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
-    """Test getting diff for specific file (returns full diff when no auto-docs history)."""
+    """Test getting diff for specific file (returns full diff when no github-actions history)."""
 
     # Modify a file and commit
     py_file = git_repo_with_files / "good_docstrings.py"
@@ -118,49 +118,49 @@ def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
         m.chdir(git_repo_with_files)
         diff = git_operations.get_file_diff(py_file)
 
-    # Should return diff from first commit to HEAD when no auto-docs history exists
+    # Should return diff from first commit to HEAD when no github-actions history exists
     assert diff != ""
     assert "good_docstrings.py" in diff
     assert "Added line" in diff
 
 
 def test_get_file_diff_with_auto_docs_history(git_repo_with_files: Path, monkeypatch):
-    """Test getting diff for specific file when auto-docs history exists."""
+    """Test getting diff for specific file when github-actions history exists."""
 
-    # Create an auto-docs commit
+    # Create a github-actions commit
     subprocess.run(
         [
             "git",
             "-c",
-            "user.name=auto-docs[bot]",
+            "user.name=github-actions[bot]",
             "-c",
-            "user.email=auto-docs@users.noreply.github.com",
+            "user.email=41898282+github-actions[bot]@users.noreply.github.com",
             "commit",
             "--allow-empty",
             "-m",
-            "Auto-docs commit",
+            "GitHub Actions commit",
         ],
         cwd=git_repo_with_files,
         check=True,
     )
 
-    # Modify a file and commit after auto-docs commit
+    # Modify a file and commit after github-actions commit
     py_file = git_repo_with_files / "good_docstrings.py"
     original_content = py_file.read_text()
-    py_file.write_text(original_content + "\n# Added after auto-docs")
+    py_file.write_text(original_content + "\n# Added after github-actions")
 
     subprocess.run(["git", "add", str(py_file)], cwd=git_repo_with_files, check=True)
-    subprocess.run(["git", "commit", "-m", "Add line after auto-docs"], cwd=git_repo_with_files, check=True)
+    subprocess.run(["git", "commit", "-m", "Add line after github-actions"], cwd=git_repo_with_files, check=True)
 
     with monkeypatch.context() as m:
         m.chdir(git_repo_with_files)
         diff = git_operations.get_file_diff(py_file)
 
-    # Should return diff from auto-docs commit to HEAD
+    # Should return diff from github-actions commit to HEAD
     assert diff != ""
     assert "good_docstrings.py" in diff
-    assert "Added after auto-docs" in diff
-    # Should not contain the entire file history, only changes since auto-docs commit
+    assert "Added after github-actions" in diff
+    # Should not contain the entire file history, only changes since github-actions commit
     assert diff.count("+") < 10  # Much smaller diff than full file
 
 
