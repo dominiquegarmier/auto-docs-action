@@ -74,7 +74,7 @@ def get_last_auto_docs_commit() -> str | None:
 
         for i, pattern in enumerate(patterns):
             try:
-                logging.debug(f"Trying pattern {i+1}/{len(patterns)}: {pattern}")
+                logging.debug(f"Trying pattern {i + 1}/{len(patterns)}: {pattern}")
                 _, stdout, _ = cmd_output("git", "log", f"--author={pattern}", "--format=%H", "-1")
                 commit_sha = stdout.strip()
                 if commit_sha:
