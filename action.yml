@@ -73,7 +73,27 @@ runs:
         # Run the action in the target repository directory
         cd $GITHUB_WORKSPACE
         echo "🔍 Starting auto-docs action..."
-        python_output=$(${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main.py 2>&1)
+        echo "Working directory: $(pwd)"
+        echo "Python executable: ${{ github.action_path }}/.venv/bin/python"
+        echo "Script path: ${{ github.action_path }}/main.py"
+
+        # Test Python executable and environment
+        echo "Testing Python executable..."
+        ${{ github.action_path }}/.venv/bin/python --version || echo "Python version check failed"
+        echo "Testing script file exists..."
+        ls -la ${{ github.action_path }}/main.py || echo "Script file not found"
+        echo "Environment check:"
+        echo "  PWD: $PWD"
+        echo "  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+SET}"
+        echo "  CLAUDE_COMMAND: $CLAUDE_COMMAND"
+        echo "  MAX_RETRIES: $MAX_RETRIES"
+
+        # Run simple debug script first
+        echo "Running simple script..."
+        ${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main_simple.py
+
+        echo "Now running real script..."
+        python_output=$(${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main.py 2>&1 || true)
         exit_code=$?
 
         # Print output for debugging FIRST (regardless of exit code)
