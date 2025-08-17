@@ -1,0 +1,81 @@
+name: 'Auto Docs Action'
+description: 'Automatically update Python docstrings using Claude Code CLI'
+author: 'Dominique Garmier'
+
+branding:
+  icon: 'book-open'
+  color: 'blue'
+
+inputs:
+  claude-command:
+    description: 'Path to Claude Code CLI executable'
+    required: false
+    default: 'claude'
+  max-retries:
+    description: 'Maximum number of retry attempts per file'
+    required: false
+    default: '3'
+  retry-delay:
+    description: 'Delay between retries in seconds'
+    required: false
+    default: '1.0'
+
+outputs:
+  files-processed:
+    description: 'Number of files processed'
+  files-changed:
+    description: 'Number of files with docstring changes'
+  success-rate:
+    description: 'Success rate as a percentage'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install UV
+      shell: bash
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        uv sync
+
+    - name: Configure Git
+      shell: bash
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+    - name: Run auto-docs action
+      shell: bash
+      env:
+        CLAUDE_COMMAND: ${{ inputs.claude-command }}
+        MAX_RETRIES: ${{ inputs.max-retries }}
+        RETRY_DELAY: ${{ inputs.retry-delay }}
+      run: |
+        cd ${{ github.action_path }}
+        python_output=$(uv run python main.py 2>&1)
+        exit_code=$?
+
+        # Extract statistics from output
+        files_processed=$(echo "$python_output" | grep -o "total_files': [0-9]*" | grep -o "[0-9]*" || echo "0")
+        files_changed=$(echo "$python_output" | grep -o "files_with_changes': [0-9]*" | grep -o "[0-9]*" || echo "0")
+        success_rate=$(echo "$python_output" | grep -o "success_rate': [0-9.]*" | grep -o "[0-9.]*" || echo "0.0")
+
+        # Set outputs
+        echo "files-processed=$files_processed" >> $GITHUB_OUTPUT
+        echo "files-changed=$files_changed" >> $GITHUB_OUTPUT
+        echo "success-rate=$success_rate" >> $GITHUB_OUTPUT
+
+        # Print output for debugging
+        echo "$python_output"
+
+        exit $exit_code

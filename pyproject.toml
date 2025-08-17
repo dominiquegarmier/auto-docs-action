@@ -1,0 +1,37 @@
+[project]
+name = "auto-docs-action"
+version = "0.1.0"
+description = "GitHub Action for automatically updating Python docstrings using Claude Code"
+readme = "README.md"
+requires-python = ">=3.9.7"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.12.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.3.0",
+    "pytest-timeout>=2.1.0",
+    "pre-commit>=4.0.0",
+]
+
+
+[tool.black]
+line-length = 127
+
+[tool.isort]
+profile = "black"
+line_length = 127
+add_imports = ["from __future__ import annotations"]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "flake8>=7.3.0",
+    "isort>=6.0.1",
+    "mypy>=1.17.1",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "pytest-mock>=3.14.1",
+]
