@@ -47,21 +47,65 @@ def cmd_output(*cmd: str, cwd: str | None = None, check: bool = True, timeout: i
         raise CalledProcessError(f"Command {cmd} timed out after {timeout} seconds") from e
 
 
+def get_last_auto_docs_commit() -> str | None:
+    """Get the SHA of the last commit made by auto-docs[bot].
+
+    Returns:
+        The commit SHA if found, None if no auto-docs commits exist
+    """
+    try:
+        # Try multiple author patterns to be robust
+        patterns = ["auto-docs[bot]", "auto-docs\\[bot\\]", "*auto-docs*"]
+
+        for pattern in patterns:
+            try:
+                _, stdout, _ = cmd_output("git", "log", f"--author={pattern}", "--format=%H", "-1")
+                commit_sha = stdout.strip()
+                if commit_sha:
+                    logging.debug(f"Found last auto-docs commit: {commit_sha[:8]} with pattern: {pattern}")
+                    return commit_sha
+            except CalledProcessError:
+                continue
+
+        logging.debug("No auto-docs commits found in history")
+        return None
+    except CalledProcessError:
+        logging.debug("No previous auto-docs commits found or git error")
+        return None
+
+
 def get_changed_py_files() -> list[Path]:
-    """Get list of changed Python files from last commit.
+    """Get list of Python files changed since the last auto-docs[bot] commit.
+
+    If no auto-docs commits exist, returns ALL Python files in the repository.
 
     Returns:
         List of Path objects for changed .py files that exist
     """
     try:
-        _, stdout, _ = cmd_output("git", "diff", "--name-only", "HEAD~1", "HEAD")
+        # Find the last auto-docs commit
+        last_auto_docs = get_last_auto_docs_commit()
 
-        py_files = []
-        for line in stdout.strip().split("\n"):
-            if line and line.endswith(".py") and Path(line).exists():
-                py_files.append(Path(line))
+        if last_auto_docs:
+            # Diff from last auto-docs commit to HEAD
+            _, stdout, _ = cmd_output("git", "diff", "--name-only", last_auto_docs, "HEAD")
+            logging.info(f"Comparing against last auto-docs commit: {last_auto_docs[:8]}")
 
-        logging.info(f"Found {len(py_files)} changed Python files")
+            py_files = []
+            for line in stdout.strip().split("\n"):
+                if line and line.endswith(".py") and Path(line).exists():
+                    py_files.append(Path(line))
+        else:
+            # Fallback: get ALL Python files in the repository (first run)
+            _, stdout, _ = cmd_output("git", "ls-files", "*.py")
+            logging.info("No previous auto-docs commits found, processing all Python files")
+
+            py_files = []
+            for line in stdout.strip().split("\n"):
+                if line and Path(line).exists():
+                    py_files.append(Path(line))
+
+        logging.info(f"Found {len(py_files)} Python files to process")
         return py_files
 
     except CalledProcessError as e:
@@ -70,17 +114,29 @@ def get_changed_py_files() -> list[Path]:
 
 
 def get_file_diff(file_path: Path) -> str:
-    """Get git diff for specific file.
+    """Get git diff for specific file since the last auto-docs[bot] commit.
+
+    If no auto-docs commits exist, returns empty string (entire file is new context).
 
     Args:
         file_path: Path to the file to get diff for
 
     Returns:
-        Git diff output as string, empty string on error
+        Git diff output as string, empty string if no auto-docs history or error
     """
     try:
-        _, stdout, _ = cmd_output("git", "diff", "HEAD~1", "HEAD", str(file_path))
-        return stdout
+        # Find the last auto-docs commit
+        last_auto_docs = get_last_auto_docs_commit()
+
+        if last_auto_docs:
+            # Diff from last auto-docs commit to HEAD
+            _, stdout, _ = cmd_output("git", "diff", last_auto_docs, "HEAD", str(file_path))
+            return stdout
+        else:
+            # No auto-docs history - return empty diff (entire file is new)
+            logging.debug(f"No auto-docs history, treating {file_path} as entirely new")
+            return ""
+
     except CalledProcessError as e:
         logging.error(f"Failed to get diff for {file_path}: {e}")
         return ""

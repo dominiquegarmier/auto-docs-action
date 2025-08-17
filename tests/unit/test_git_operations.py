@@ -55,7 +55,7 @@ def test_get_changed_py_files_empty_repo(temp_git_repo: Path, monkeypatch):
 
 
 def test_get_changed_py_files_with_changes(git_repo_with_files: Path, monkeypatch):
-    """Test detection of changed Python files."""
+    """Test detection of changed Python files (returns all files when no auto-docs history)."""
     monkeypatch.chdir(git_repo_with_files)
 
     # Modify a Python file
@@ -67,15 +67,16 @@ def test_get_changed_py_files_with_changes(git_repo_with_files: Path, monkeypatc
     subprocess.run(["git", "add", str(py_file)], cwd=git_repo_with_files, check=True)
     subprocess.run(["git", "commit", "-m", "Modify Python file"], cwd=git_repo_with_files, check=True)
 
-    # Test our function
+    # Test our function - should return ALL Python files since no auto-docs history
     changed_files = git_operations.get_changed_py_files()
 
-    assert len(changed_files) == 1
-    assert changed_files[0].name == "good_docstrings.py"
+    assert len(changed_files) == 4  # All Python files in repo
+    file_names = {f.name for f in changed_files}
+    assert file_names == {"good_docstrings.py", "missing_docstrings.py", "mixed_quality.py", "syntax_error.py"}
 
 
 def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeypatch):
-    """Test that only .py files are returned."""
+    """Test that only .py files are returned (all files when no auto-docs history)."""
     monkeypatch.chdir(git_repo_with_files)
 
     # Create and modify non-Python files
@@ -92,13 +93,15 @@ def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeyp
 
     changed_files = git_operations.get_changed_py_files()
 
-    # Should only return the .py file
-    assert len(changed_files) == 1
-    assert changed_files[0].name == "missing_docstrings.py"
+    # Should return ALL Python files (no auto-docs history), excluding .txt files
+    assert len(changed_files) == 4  # All Python files in repo
+    file_names = {f.name for f in changed_files}
+    assert file_names == {"good_docstrings.py", "missing_docstrings.py", "mixed_quality.py", "syntax_error.py"}
+    # txt file should be excluded
 
 
 def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
-    """Test getting diff for specific file."""
+    """Test getting diff for specific file (returns empty when no auto-docs history)."""
     monkeypatch.chdir(git_repo_with_files)
 
     # Modify a file and commit
@@ -111,9 +114,8 @@ def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
 
     diff = git_operations.get_file_diff(py_file)
 
-    assert "# Added line" in diff
-    assert "+++" in diff  # Git diff format
-    assert "---" in diff
+    # Should return empty diff when no auto-docs history exists
+    assert diff == ""
 
 
 def test_stage_file(git_repo_with_files: Path, monkeypatch):
