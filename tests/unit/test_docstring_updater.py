@@ -59,7 +59,7 @@ index 1234567..abcdefg 100644
     assert str(file_path) in prompt
     assert git_diff in prompt
     assert "Edit tool" in prompt
-    assert "changed in" in prompt
+    assert "what triggered this update" in prompt
 
 
 @patch("subprocess.run")
@@ -78,7 +78,17 @@ def test_execute_claude_cli_success(mock_run):
     # Verify subprocess was called correctly for edit tool
     mock_run.assert_called_once()
     call_args = mock_run.call_args
-    assert call_args[0][0] == ["claude", "test prompt"]
+    assert call_args[0][0] == [
+        "claude",
+        "-p",
+        "test prompt",
+        "--verbose",
+        "--output-format",
+        "json",
+        "--allowedTools",
+        "Edit",
+        "Read",
+    ]
     assert call_args[1]["cwd"] == file_path.parent
     assert call_args[1]["capture_output"] is True
     assert call_args[1]["text"] is True

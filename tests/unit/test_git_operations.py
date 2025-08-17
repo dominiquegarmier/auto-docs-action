@@ -46,9 +46,10 @@ def test_timeout_handling():
 
 def test_get_changed_py_files_empty_repo(temp_git_repo: Path, monkeypatch):
     """Test getting changed files from empty repository."""
-    monkeypatch.chdir(temp_git_repo)
 
-    changed_files = git_operations.get_changed_py_files()
+    with monkeypatch.context() as m:
+        m.chdir(temp_git_repo)
+        changed_files = git_operations.get_changed_py_files()
 
     # Should return empty list for empty repo (no HEAD~1)
     assert changed_files == []
@@ -56,7 +57,6 @@ def test_get_changed_py_files_empty_repo(temp_git_repo: Path, monkeypatch):
 
 def test_get_changed_py_files_with_changes(git_repo_with_files: Path, monkeypatch):
     """Test detection of changed Python files (returns all files when no auto-docs history)."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Modify a Python file
     py_file = git_repo_with_files / "good_docstrings.py"
@@ -68,7 +68,9 @@ def test_get_changed_py_files_with_changes(git_repo_with_files: Path, monkeypatc
     subprocess.run(["git", "commit", "-m", "Modify Python file"], cwd=git_repo_with_files, check=True)
 
     # Test our function - should return ALL Python files since no auto-docs history
-    changed_files = git_operations.get_changed_py_files()
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        changed_files = git_operations.get_changed_py_files()
 
     assert len(changed_files) == 4  # All Python files in repo
     file_names = {f.name for f in changed_files}
@@ -77,7 +79,6 @@ def test_get_changed_py_files_with_changes(git_repo_with_files: Path, monkeypatc
 
 def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeypatch):
     """Test that only .py files are returned (all files when no auto-docs history)."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Create and modify non-Python files
     txt_file = git_repo_with_files / "readme.txt"
@@ -91,7 +92,9 @@ def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeyp
     subprocess.run(["git", "add", "."], cwd=git_repo_with_files, check=True)
     subprocess.run(["git", "commit", "-m", "Add txt file and modify py file"], cwd=git_repo_with_files, check=True)
 
-    changed_files = git_operations.get_changed_py_files()
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        changed_files = git_operations.get_changed_py_files()
 
     # Should return ALL Python files (no auto-docs history), excluding .txt files
     assert len(changed_files) == 4  # All Python files in repo
@@ -102,7 +105,6 @@ def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeyp
 
 def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
     """Test getting diff for specific file (returns empty when no auto-docs history)."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Modify a file and commit
     py_file = git_repo_with_files / "good_docstrings.py"
@@ -112,7 +114,9 @@ def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
     subprocess.run(["git", "add", str(py_file)], cwd=git_repo_with_files, check=True)
     subprocess.run(["git", "commit", "-m", "Add line to file"], cwd=git_repo_with_files, check=True)
 
-    diff = git_operations.get_file_diff(py_file)
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        diff = git_operations.get_file_diff(py_file)
 
     # Should return empty diff when no auto-docs history exists
     assert diff == ""
@@ -120,13 +124,14 @@ def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
 
 def test_stage_file(git_repo_with_files: Path, monkeypatch):
     """Test staging individual files."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Modify a file (don't stage it yet)
     py_file = git_repo_with_files / "missing_docstrings.py"
     py_file.write_text("# Modified content")
 
-    success = git_operations.stage_file(py_file)
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        success = git_operations.stage_file(py_file)
 
     assert success is True
 
@@ -139,7 +144,6 @@ def test_stage_file(git_repo_with_files: Path, monkeypatch):
 
 def test_restore_file(git_repo_with_files: Path, monkeypatch):
     """Test restoring files to HEAD state."""
-    monkeypatch.chdir(git_repo_with_files)
 
     py_file = git_repo_with_files / "good_docstrings.py"
 
@@ -151,7 +155,9 @@ def test_restore_file(git_repo_with_files: Path, monkeypatch):
     assert py_file.read_text() != original_content
 
     # Restore file
-    success = git_operations.restore_file(py_file)
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        success = git_operations.restore_file(py_file)
 
     assert success is True
     assert py_file.read_text() == original_content
@@ -159,30 +165,34 @@ def test_restore_file(git_repo_with_files: Path, monkeypatch):
 
 def test_has_staged_files(git_repo_with_files: Path, monkeypatch):
     """Test checking for staged files."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Initially no staged files
-    assert git_operations.has_staged_files() is False
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        assert git_operations.has_staged_files() is False
 
     # Modify and stage a file
     py_file = git_repo_with_files / "missing_docstrings.py"
     py_file.write_text("# New content")
-    git_operations.stage_file(py_file)
 
-    # Now should have staged files
-    assert git_operations.has_staged_files() is True
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        git_operations.stage_file(py_file)
+        # Now should have staged files
+        assert git_operations.has_staged_files() is True
 
 
 def test_create_commit(git_repo_with_files: Path, monkeypatch):
     """Test creating commits with staged files."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Modify and stage a file
     py_file = git_repo_with_files / "missing_docstrings.py"
     py_file.write_text("# New content")
     subprocess.run(["git", "add", str(py_file)], cwd=git_repo_with_files, check=True)
 
-    success = git_operations.create_commit("Test commit message")
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        success = git_operations.create_commit("Test commit message")
 
     assert success is True
 
@@ -202,9 +212,10 @@ def test_create_commit(git_repo_with_files: Path, monkeypatch):
 
 def test_create_commit_no_staged_files(git_repo_with_files: Path, monkeypatch):
     """Test commit creation fails when no files are staged."""
-    monkeypatch.chdir(git_repo_with_files)
 
-    success = git_operations.create_commit("Empty commit")
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        success = git_operations.create_commit("Empty commit")
 
     # Should fail because nothing is staged
     assert success is False

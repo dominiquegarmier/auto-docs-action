@@ -102,6 +102,12 @@ def test_large_diff_output():
         os.system("git add large.py")
         os.system("git commit -m 'Add large file'")
 
+        # Create an auto-docs commit first
+        os.system(
+            'git -c user.name="auto-docs[bot]" -c user.email="auto-docs@users.noreply.github.com" '
+            'commit --allow-empty -m "Auto-docs commit"'
+        )
+
         # Modify it significantly
         modified_content = large_content + "\n\ndef new_function():\n    return 'new'"
         large_file.write_text(modified_content)
@@ -206,9 +212,9 @@ def test_environment_variable_handling():
 def test_main_with_no_changed_files():
     """Test main function behavior when no files need processing."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        old_cwd = os.getcwd()
+        repo_path = Path(temp_dir)
         try:
-            os.chdir(temp_dir)
+            os.chdir(repo_path)
 
             # Setup minimal git repo with no commits
             os.system("git init")
@@ -221,7 +227,8 @@ def test_main_with_no_changed_files():
                 assert exit_code == 0  # Success even with no files
 
         finally:
-            os.chdir(old_cwd)
+            # Change back to a safe directory
+            os.chdir(Path(__file__).parent.parent)
 
 
 def test_file_permission_errors():

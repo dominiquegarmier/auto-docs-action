@@ -17,9 +17,9 @@ from file_processor import FileProcessor
 def test_full_workflow_integration():
     """Test the complete workflow with mocked Claude CLI."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        old_cwd = os.getcwd()
+        repo_path = Path(temp_dir)
         try:
-            os.chdir(temp_dir)
+            os.chdir(repo_path)
 
             # Setup git repo
             os.system("git init")
@@ -45,11 +45,28 @@ class Calculator:
             os.system("git add test_module.py")
             os.system("git commit -m 'Add subtract function'")
 
-            # Mock Claude CLI to add docstrings
-            def mock_claude_execution(cmd, **kwargs):
-                if cmd[0] == "claude":
-                    # Simulate Claude adding docstrings
-                    file_path = kwargs.get("cwd", Path.cwd()) / "test_module.py"
+            # Create an auto-docs commit first so diff logic works
+            os.system(
+                'git -c user.name="auto-docs[bot]" -c user.email="auto-docs@users.noreply.github.com" '
+                'commit --allow-empty -m "Auto-docs commit"'
+            )
+
+            # Add another change after auto-docs commit so there's something to diff
+            final_content = modified_content + "\ndef divide(a, b):\n    return a / b\n"
+            test_file.write_text(final_content)
+            os.system("git add test_module.py")
+            os.system("git commit -m 'Add divide function'")
+
+            # Set environment variables
+            os.environ["CLAUDE_COMMAND"] = "claude"
+            os.environ["MAX_RETRIES"] = "2"
+            os.environ["ANTHROPIC_API_KEY"] = "test-key"
+
+            # Run main with mocked Claude CLI execution
+            with patch("docstring_updater._execute_claude_cli") as mock_claude:
+                # Configure mock to simulate successful Claude execution that adds docstrings
+                def side_effect(prompt, file_path, claude_command):
+                    # Simulate Claude adding docstrings to the file
                     content_with_docstrings = '''def add_numbers(a, b):
     """Add two numbers together.
 
@@ -88,18 +105,25 @@ def subtract(a, b):
         The difference a - b.
     """
     return a - b
+
+def divide(a, b):
+    """Divide a by b.
+
+    Args:
+        a: Dividend.
+        b: Divisor.
+
+    Returns:
+        The quotient a / b.
+    """
+    return a / b
 '''
                     file_path.write_text(content_with_docstrings)
-                    return MagicMock(returncode=0, stdout="", stderr="")
-                return MagicMock(returncode=1, stdout="", stderr="Command not found")
+                    from docstring_updater import DocstringUpdateResult
 
-            # Set environment variables
-            os.environ["CLAUDE_COMMAND"] = "claude"
-            os.environ["MAX_RETRIES"] = "2"
-            os.environ["ANTHROPIC_API_KEY"] = "test-key"
+                    return DocstringUpdateResult(success=True)
 
-            # Run main with mocked subprocess
-            with patch("subprocess.run", side_effect=mock_claude_execution):
+                mock_claude.side_effect = side_effect
                 exit_code = main.main()
 
             # Verify results
@@ -112,15 +136,16 @@ def subtract(a, b):
             assert '"""Subtract b from a.' in final_content
 
         finally:
-            os.chdir(old_cwd)
+            # Change back to a safe directory
+            os.chdir(Path(__file__).parent.parent)
 
 
 def test_workflow_with_validation_failure():
     """Test workflow when AST validation fails."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        old_cwd = os.getcwd()
+        repo_path = Path(temp_dir)
         try:
-            os.chdir(temp_dir)
+            os.chdir(repo_path)
 
             # Setup git repo
             os.system("git init")
@@ -134,37 +159,44 @@ def test_workflow_with_validation_failure():
             os.system("git add test_module.py")
             os.system("git commit -m 'Initial commit'")
 
+            # Create an auto-docs commit first so diff logic works
+            os.system(
+                'git -c user.name="auto-docs[bot]" -c user.email="auto-docs@users.noreply.github.com" '
+                'commit --allow-empty -m "Auto-docs commit"'
+            )
+
             # Modify file
             test_file.write_text("def add(a, b):\n    return a + b + 1\n")  # Change logic
             os.system("git add test_module.py")
             os.system("git commit -m 'Modify function'")
-
-            # Mock Claude CLI to make invalid changes
-            def mock_claude_bad_execution(cmd, **kwargs):
-                if cmd[0] == "claude":
-                    # Simulate Claude making logic changes (should fail validation)
-                    file_path = kwargs.get("cwd", Path.cwd()) / "test_module.py"
-                    bad_content = '''def add(a, b):
-    """Add two numbers."""
-    return a * b  # Changed logic! Should fail validation
-'''
-                    file_path.write_text(bad_content)
-                    return MagicMock(returncode=0, stdout="", stderr="")
-                return MagicMock(returncode=1, stdout="", stderr="Command not found")
 
             os.environ["CLAUDE_COMMAND"] = "claude"
             os.environ["MAX_RETRIES"] = "2"
             os.environ["ANTHROPIC_API_KEY"] = "test-key"
 
             # Should handle validation failure gracefully
-            with patch("subprocess.run", side_effect=mock_claude_bad_execution):
+            with patch("docstring_updater._execute_claude_cli") as mock_claude:
+                # Configure mock to simulate Claude making logic changes that fail validation
+                def side_effect(prompt, file_path, claude_command):
+                    # Simulate Claude making logic changes (should fail validation)
+                    bad_content = '''def add(a, b):
+    """Add two numbers."""
+    return a * b  # Changed logic! Should fail validation
+'''
+                    file_path.write_text(bad_content)
+                    from docstring_updater import DocstringUpdateResult
+
+                    return DocstringUpdateResult(success=True)
+
+                mock_claude.side_effect = side_effect
                 exit_code = main.main()
 
             # Should report failures but not crash
             assert exit_code == 1  # Failure exit code due to failed processing
 
         finally:
-            os.chdir(old_cwd)
+            # Change back to a safe directory
+            os.chdir(Path(__file__).parent.parent)
 
 
 def test_processor_retry_logic():
