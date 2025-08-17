@@ -43,7 +43,7 @@ The project is implemented with 5 main Python modules:
 
 #### 1. git_operations.py (IMPLEMENTED ✅)
 - **cmd_output()**: Subprocess utility following pre-commit patterns
-- **GitOperations class**: All git operations with proper error handling
+- **Function-based git operations**: All git operations with proper error handling
   - `get_changed_py_files()`: Detects Python files changed in last commit
   - `get_file_diff()`: Gets git diff for specific files
   - `stage_file()`: Stages individual files
@@ -52,7 +52,7 @@ The project is implemented with 5 main Python modules:
   - `create_commit()`: Creates commits with bot identity and [skip ci]
 
 #### 2. ast_validator.py (IMPLEMENTED ✅)
-- **ASTValidator class**: Complete AST-based validation
+- **Function-based AST validation**: Complete AST-based validation
   - `validate_changes()`: Main validation entry point
   - `_extract_code_structure()`: Extracts functions/classes without docstrings
   - `_structures_match()`: Compares code structures
@@ -61,12 +61,12 @@ The project is implemented with 5 main Python modules:
 - **ValidationResult dataclass**: Structured validation results
 
 #### 3. docstring_updater.py (IMPLEMENTED ✅)
-- **DocstringUpdater class**: Claude Code CLI interface
+- **Function-based Claude Code CLI interface**: Complete docstring updating
   - `update_docstrings()`: Main update orchestration
   - `_create_docstring_prompt()`: Generates prompts for Claude
-  - `_execute_claude_cli()`: Subprocess execution with timeouts
-  - `_extract_updated_content()`: Parses Claude responses (multiple formats)
+  - `_execute_claude_cli()`: Subprocess execution with timeouts and edit tool
 - **DocstringUpdateResult dataclass**: Structured update results
+- **DOCSTRING_UPDATE_PROMPT_TEMPLATE**: Module-scope constant for prompts
 
 #### 4. file_processor.py (IMPLEMENTED ✅)
 - **FileProcessor class**: Complete processing orchestration
@@ -87,11 +87,11 @@ The project is implemented with 5 main Python modules:
 
 ### Testing Strategy (COMPLETED ✅)
 
-#### Unit Tests (65 tests, 100% passing)
-- **test_git_operations.py**: 13 tests for git operations
-- **test_ast_validator.py**: 12 tests for AST validation
-- **test_docstring_updater.py**: 21 tests for Claude CLI interface
-- **test_file_processor.py**: 19 tests for processing orchestration
+#### Unit Tests (60 function-based tests, 100% passing)
+- **test_git_operations.py**: 13 function-based tests for git operations
+- **test_ast_validator.py**: 12 function-based tests for AST validation
+- **test_docstring_updater.py**: 16 function-based tests for Claude CLI interface
+- **test_file_processor.py**: 19 function-based tests for processing orchestration
 
 #### Test Coverage Areas
 - Successful operations and error conditions

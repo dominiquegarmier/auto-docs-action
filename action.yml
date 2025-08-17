@@ -7,26 +7,25 @@ branding:
   color: 'blue'
 
 inputs:
-  claude-command:
+  anthropic_api_key:
+    description: 'Your Anthropic API key for Claude Code'
+    required: true
+  max_retries:
+    description: 'Maximum number of retry attempts per file'
+    required: false
+    default: '2'
+  claude_command:
     description: 'Path to Claude Code CLI executable'
     required: false
     default: 'claude'
-  max-retries:
-    description: 'Maximum number of retry attempts per file'
-    required: false
-    default: '3'
-  retry-delay:
-    description: 'Delay between retries in seconds'
-    required: false
-    default: '1.0'
 
 outputs:
-  files-processed:
-    description: 'Number of files processed'
-  files-changed:
-    description: 'Number of files with docstring changes'
-  success-rate:
-    description: 'Success rate as a percentage'
+  files_processed:
+    description: 'Total number of Python files processed'
+  files_successful:
+    description: 'Number of files successfully updated'
+  files_failed:
+    description: 'Number of files that failed processing'
 
 runs:
   using: 'composite'
@@ -36,11 +35,21 @@ runs:
       with:
         python-version: '3.12'
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
     - name: Install UV
       shell: bash
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
         echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Install Claude Code CLI
+      shell: bash
+      run: |
+        npm install -g @anthropic-ai/claude-code
 
     - name: Install dependencies
       shell: bash
@@ -57,9 +66,9 @@ runs:
     - name: Run auto-docs action
       shell: bash
       env:
-        CLAUDE_COMMAND: ${{ inputs.claude-command }}
-        MAX_RETRIES: ${{ inputs.max-retries }}
-        RETRY_DELAY: ${{ inputs.retry-delay }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        CLAUDE_COMMAND: ${{ inputs.claude_command }}
+        MAX_RETRIES: ${{ inputs.max_retries }}
       run: |
         cd ${{ github.action_path }}
         python_output=$(uv run python main.py 2>&1)
@@ -67,13 +76,13 @@ runs:
 
         # Extract statistics from output
         files_processed=$(echo "$python_output" | grep -o "total_files': [0-9]*" | grep -o "[0-9]*" || echo "0")
-        files_changed=$(echo "$python_output" | grep -o "files_with_changes': [0-9]*" | grep -o "[0-9]*" || echo "0")
-        success_rate=$(echo "$python_output" | grep -o "success_rate': [0-9.]*" | grep -o "[0-9.]*" || echo "0.0")
+        files_successful=$(echo "$python_output" | grep -o "successful': [0-9]*" | grep -o "[0-9]*" || echo "0")
+        files_failed=$(echo "$python_output" | grep -o "failed': [0-9]*" | grep -o "[0-9]*" || echo "0")
 
         # Set outputs
-        echo "files-processed=$files_processed" >> $GITHUB_OUTPUT
-        echo "files-changed=$files_changed" >> $GITHUB_OUTPUT
-        echo "success-rate=$success_rate" >> $GITHUB_OUTPUT
+        echo "files_processed=$files_processed" >> $GITHUB_OUTPUT
+        echo "files_successful=$files_successful" >> $GITHUB_OUTPUT
+        echo "files_failed=$files_failed" >> $GITHUB_OUTPUT
 
         # Print output for debugging
         echo "$python_output"

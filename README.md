@@ -158,12 +158,12 @@ uv run pre-commit run --all-files
 
 ```
 ├── main.py                     # Entry point
-├── git_operations.py           # Git commands via subprocess
-├── ast_validator.py            # AST-based safety validation
-├── docstring_updater.py        # Claude Code CLI interface
-├── file_processor.py           # Retry logic orchestrator
+├── git_operations.py           # Git commands via subprocess (function-based)
+├── ast_validator.py            # AST-based safety validation (function-based)
+├── docstring_updater.py        # Claude Code CLI interface (function-based)
+├── file_processor.py           # Retry logic orchestrator (class-based)
 ├── action.yml                  # GitHub Action configuration
-└── tests/                      # Comprehensive test suite
+└── tests/                      # Comprehensive test suite (function-based tests)
 ```
 
 ## 📖 Documentation
