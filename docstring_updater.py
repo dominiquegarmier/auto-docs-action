@@ -10,27 +10,29 @@ from pathlib import Path
 import git_operations
 
 # Prompt template for docstring updates using Claude Code CLI edit tool
-DOCSTRING_UPDATE_PROMPT_TEMPLATE = """Based on the git diff below, please add or improve Google-style docstrings \
-for the functions/classes that were changed in {file_path}.
+DOCSTRING_UPDATE_PROMPT_TEMPLATE = """Please add Google-style docstrings to ALL functions, classes, and methods in \
+{file_path} that don't already have them.
 
-Git diff showing what changed:
+Git diff context (what triggered this update):
 ```
 {git_diff}
 ```
 
-Requirements:
-1. Only edit the file {file_path} - focus on the changed functions/classes shown in the diff
-2. Follow Google-style docstring conventions exactly
-3. Include Args, Returns, and Raises sections as appropriate
-4. Add comprehensive type information in docstrings that complements type hints
-5. CRITICAL: Do not modify function signatures, imports, or any logic - ONLY add/improve docstrings
-6. If a function already has a complete Google-style docstring, leave it unchanged
-7. For functions without docstrings that were changed, add complete Google-style docstrings
-8. For functions with incomplete docstrings that were changed, improve them to full Google-style format
-9. Focus only on the areas that changed according to the git diff
+REQUIREMENTS - MUST FOLLOW EXACTLY:
+1. ONLY edit the file {file_path} - no other files
+2. ADD docstrings to EVERY function, class, and method in {file_path} that lacks a docstring
+3. Follow Google-style docstring conventions exactly
+4. Include Args, Returns, and Raises sections as appropriate
+5. Add comprehensive type information in docstrings that complements type hints
+6. CRITICAL: Do not modify function signatures, imports, or any logic - ONLY add docstrings
+7. If a function/class/method already has a complete docstring, leave it unchanged
+8. If a function/class/method already has an incomplete docstring, improve it to full Google-style format
+9. Process the ENTIRE file {file_path} - not just the changed areas from the diff
 
-Use the Edit tool to make the changes directly to {file_path}. Focus on improving documentation quality \
-for the changed code while preserving all existing functionality."""
+IMPORTANT: You must add docstrings to ALL functions/classes/methods in the file that don't have them, \
+regardless of whether they appear in the git diff or not. The diff is just context for why this file needs updates.
+
+Use the Edit tool to make the changes directly to {file_path}. Add comprehensive documentation to improve code quality."""
 
 
 @dataclass
