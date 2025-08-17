@@ -30,6 +30,7 @@ def cmd_output(*cmd: str, cwd: str | None = None, check: bool = True, timeout: i
         CalledProcessError: If check=True and command fails or times out
     """
     try:
+        logging.debug(f"🔧 Running command: {' '.join(cmd)} (cwd={cwd}, timeout={timeout})")
         result = subprocess.run(
             cmd,
             cwd=cwd,
@@ -38,13 +39,26 @@ def cmd_output(*cmd: str, cwd: str | None = None, check: bool = True, timeout: i
             timeout=timeout,
         )
 
+        logging.debug(
+            f"✅ Command completed: return_code={result.returncode}, "
+            f"stdout_len={len(result.stdout)}, stderr_len={len(result.stderr)}"
+        )
+
         if check and result.returncode != 0:
-            raise CalledProcessError(f"Command {cmd} failed with code {result.returncode}: {result.stderr.strip()}")
+            error_msg = f"Command {cmd} failed with code {result.returncode}: {result.stderr.strip()}"
+            logging.error(f"❌ {error_msg}")
+            raise CalledProcessError(error_msg)
 
         return result.returncode, result.stdout, result.stderr
 
     except subprocess.TimeoutExpired as e:
-        raise CalledProcessError(f"Command {cmd} timed out after {timeout} seconds") from e
+        error_msg = f"Command {cmd} timed out after {timeout} seconds"
+        logging.error(f"⏰ {error_msg}")
+        raise CalledProcessError(error_msg) from e
+    except Exception as e:
+        error_msg = f"Unexpected error running command {cmd}: {e}"
+        logging.error(f"❌ {error_msg}")
+        raise CalledProcessError(error_msg) from e
 
 
 def get_last_auto_docs_commit() -> str | None:
@@ -54,23 +68,31 @@ def get_last_auto_docs_commit() -> str | None:
         The commit SHA if found, None if no auto-docs commits exist
     """
     try:
+        logging.info("🔍 Searching for last github-actions commit...")
         # Try multiple author patterns to be robust
         patterns = ["github-actions[bot]", "github-actions\\[bot\\]", "*github-actions*"]
 
-        for pattern in patterns:
+        for i, pattern in enumerate(patterns):
             try:
+                logging.debug(f"Trying pattern {i+1}/{len(patterns)}: {pattern}")
                 _, stdout, _ = cmd_output("git", "log", f"--author={pattern}", "--format=%H", "-1")
                 commit_sha = stdout.strip()
                 if commit_sha:
-                    logging.debug(f"Found last github-actions commit: {commit_sha[:8]} with pattern: {pattern}")
+                    logging.info(f"✅ Found last github-actions commit: {commit_sha[:8]} with pattern: {pattern}")
                     return commit_sha
-            except CalledProcessError:
+                else:
+                    logging.debug(f"Pattern {pattern} returned empty result")
+            except CalledProcessError as e:
+                logging.debug(f"Pattern {pattern} failed: {e}")
                 continue
 
-        logging.debug("No github-actions commits found in history")
+        logging.info("ℹ️ No github-actions commits found in history")
         return None
-    except CalledProcessError:
-        logging.debug("No previous github-actions commits found or git error")
+    except CalledProcessError as e:
+        logging.info(f"ℹ️ No previous github-actions commits found or git error: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"❌ Unexpected error in get_last_auto_docs_commit: {e}", exc_info=True)
         return None
 
 
@@ -83,33 +105,49 @@ def get_changed_py_files() -> list[Path]:
         List of Path objects for changed .py files that exist
     """
     try:
+        logging.info("🔍 Starting get_changed_py_files...")
+
         # Find the last github-actions commit
+        logging.info("🔍 Looking for last github-actions commit...")
         last_auto_docs = get_last_auto_docs_commit()
+        logging.info(f"✅ get_last_auto_docs_commit returned: {last_auto_docs}")
 
         if last_auto_docs:
             # Diff from last github-actions commit to HEAD
+            logging.info(f"🔍 Diffing from {last_auto_docs[:8]} to HEAD...")
             _, stdout, _ = cmd_output("git", "diff", "--name-only", last_auto_docs, "HEAD")
             logging.info(f"Comparing against last github-actions commit: {last_auto_docs[:8]}")
+            logging.info(f"Git diff output: {repr(stdout[:200])}...")
 
             py_files = []
             for line in stdout.strip().split("\n"):
-                if line and line.endswith(".py") and Path(line).exists():
-                    py_files.append(Path(line))
+                if line and line.endswith(".py"):
+                    if Path(line).exists():
+                        py_files.append(Path(line))
+                        logging.debug(f"Added Python file: {line}")
+                    else:
+                        logging.debug(f"Skipped non-existent file: {line}")
         else:
             # Fallback: get ALL Python files in the repository (first run)
+            logging.info("🔍 No github-actions history, listing all Python files...")
             _, stdout, _ = cmd_output("git", "ls-files", "*.py")
             logging.info("No previous github-actions commits found, processing all Python files")
+            logging.info(f"Git ls-files output: {repr(stdout[:200])}...")
 
             py_files = []
             for line in stdout.strip().split("\n"):
                 if line and Path(line).exists():
                     py_files.append(Path(line))
+                    logging.debug(f"Added Python file: {line}")
 
-        logging.info(f"Found {len(py_files)} Python files to process")
+        logging.info(f"Found {len(py_files)} Python files to process: {[str(f) for f in py_files]}")
         return py_files
 
     except CalledProcessError as e:
         logging.error(f"Failed to get changed files: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error in get_changed_py_files: {e}", exc_info=True)
         return []
 
 

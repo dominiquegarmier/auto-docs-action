@@ -92,7 +92,7 @@ def test_execute_claude_cli_success(mock_run):
     assert call_args[1]["cwd"] == file_path.parent
     assert call_args[1]["capture_output"] is True
     assert call_args[1]["text"] is True
-    assert call_args[1]["timeout"] == 300
+    assert call_args[1]["timeout"] == 120
 
 
 @patch("subprocess.run")
