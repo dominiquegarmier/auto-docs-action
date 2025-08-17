@@ -70,8 +70,9 @@ runs:
         CLAUDE_COMMAND: ${{ inputs.claude_command }}
         MAX_RETRIES: ${{ inputs.max_retries }}
       run: |
-        cd ${{ github.action_path }}
-        python_output=$(uv run python main.py 2>&1)
+        # Run the action in the target repository directory
+        cd $GITHUB_WORKSPACE
+        python_output=$(${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main.py 2>&1)
         exit_code=$?
 
         # Extract statistics from output
