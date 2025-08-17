@@ -13,7 +13,6 @@ import git_operations
 
 def test_get_last_auto_docs_commit_found(git_repo_with_files: Path, monkeypatch):
     """Test finding the last auto-docs commit when one exists."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Create an auto-docs commit
     py_file = git_repo_with_files / "test.py"
@@ -38,7 +37,9 @@ def test_get_last_auto_docs_commit_found(git_repo_with_files: Path, monkeypatch)
     result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_repo_with_files, capture_output=True, text=True, check=True)
     expected_sha = result.stdout.strip()
 
-    commit_sha = git_operations.get_last_auto_docs_commit()
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        commit_sha = git_operations.get_last_auto_docs_commit()
 
     assert commit_sha == expected_sha
     assert len(commit_sha) == 40  # Full SHA length
@@ -46,17 +47,17 @@ def test_get_last_auto_docs_commit_found(git_repo_with_files: Path, monkeypatch)
 
 def test_get_last_auto_docs_commit_none_found(git_repo_with_files: Path, monkeypatch):
     """Test when no auto-docs commits exist."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Only regular commits exist in the repo
-    commit_sha = git_operations.get_last_auto_docs_commit()
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        commit_sha = git_operations.get_last_auto_docs_commit()
 
     assert commit_sha is None
 
 
 def test_get_last_auto_docs_commit_multiple_commits(git_repo_with_files: Path, monkeypatch):
     """Test getting the most recent auto-docs commit when multiple exist."""
-    monkeypatch.chdir(git_repo_with_files)
 
     # Create first auto-docs commit
     py_file = git_repo_with_files / "test1.py"
