@@ -104,7 +104,7 @@ def test_get_changed_files_filters_non_python(git_repo_with_files: Path, monkeyp
 
 
 def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
-    """Test getting diff for specific file (returns empty when no auto-docs history)."""
+    """Test getting diff for specific file (returns full diff when no auto-docs history)."""
 
     # Modify a file and commit
     py_file = git_repo_with_files / "good_docstrings.py"
@@ -118,8 +118,50 @@ def test_get_file_diff(git_repo_with_files: Path, monkeypatch):
         m.chdir(git_repo_with_files)
         diff = git_operations.get_file_diff(py_file)
 
-    # Should return empty diff when no auto-docs history exists
-    assert diff == ""
+    # Should return diff from first commit to HEAD when no auto-docs history exists
+    assert diff != ""
+    assert "good_docstrings.py" in diff
+    assert "Added line" in diff
+
+
+def test_get_file_diff_with_auto_docs_history(git_repo_with_files: Path, monkeypatch):
+    """Test getting diff for specific file when auto-docs history exists."""
+
+    # Create an auto-docs commit
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=auto-docs[bot]",
+            "-c",
+            "user.email=auto-docs@users.noreply.github.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "Auto-docs commit",
+        ],
+        cwd=git_repo_with_files,
+        check=True,
+    )
+
+    # Modify a file and commit after auto-docs commit
+    py_file = git_repo_with_files / "good_docstrings.py"
+    original_content = py_file.read_text()
+    py_file.write_text(original_content + "\n# Added after auto-docs")
+
+    subprocess.run(["git", "add", str(py_file)], cwd=git_repo_with_files, check=True)
+    subprocess.run(["git", "commit", "-m", "Add line after auto-docs"], cwd=git_repo_with_files, check=True)
+
+    with monkeypatch.context() as m:
+        m.chdir(git_repo_with_files)
+        diff = git_operations.get_file_diff(py_file)
+
+    # Should return diff from auto-docs commit to HEAD
+    assert diff != ""
+    assert "good_docstrings.py" in diff
+    assert "Added after auto-docs" in diff
+    # Should not contain the entire file history, only changes since auto-docs commit
+    assert diff.count("+") < 10  # Much smaller diff than full file
 
 
 def test_stage_file(git_repo_with_files: Path, monkeypatch):

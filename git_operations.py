@@ -116,13 +116,13 @@ def get_changed_py_files() -> list[Path]:
 def get_file_diff(file_path: Path) -> str:
     """Get git diff for specific file since the last auto-docs[bot] commit.
 
-    If no auto-docs commits exist, returns empty string (entire file is new context).
+    If no auto-docs commits exist, returns diff from first commit to HEAD.
 
     Args:
         file_path: Path to the file to get diff for
 
     Returns:
-        Git diff output as string, empty string if no auto-docs history or error
+        Git diff output as string, empty string if error
     """
     try:
         # Find the last auto-docs commit
@@ -133,9 +133,27 @@ def get_file_diff(file_path: Path) -> str:
             _, stdout, _ = cmd_output("git", "diff", last_auto_docs, "HEAD", str(file_path))
             return stdout
         else:
-            # No auto-docs history - return empty diff (entire file is new)
-            logging.debug(f"No auto-docs history, treating {file_path} as entirely new")
-            return ""
+            # No auto-docs history - diff from first commit to HEAD
+            try:
+                # Get the first commit in the repository
+                _, first_commit, _ = cmd_output("git", "rev-list", "--max-parents=0", "HEAD")
+                first_commit = first_commit.strip()
+
+                # Diff from first commit to HEAD for this file
+                _, stdout, _ = cmd_output("git", "diff", first_commit, "HEAD", str(file_path))
+                logging.debug(f"No auto-docs history, showing full diff for {file_path} from first commit")
+                return stdout
+            except CalledProcessError:
+                # Fallback: if we can't find first commit, show the entire file as added
+                try:
+                    _, stdout, _ = cmd_output("git", "show", f"HEAD:{file_path}")
+                    # Format as a diff showing the entire file as added
+                    lines = stdout.split("\n")
+                    diff_lines = ["--- /dev/null", f"+++ b/{file_path}"] + [f"+{line}" for line in lines]
+                    return "\n".join(diff_lines)
+                except CalledProcessError:
+                    logging.warning(f"Could not generate diff for {file_path}")
+                    return ""
 
     except CalledProcessError as e:
         logging.error(f"Failed to get diff for {file_path}: {e}")
