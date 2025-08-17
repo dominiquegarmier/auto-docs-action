@@ -118,14 +118,21 @@ def _execute_claude_cli(prompt: str, file_path: Path, claude_command: str) -> Do
         DocstringUpdateResult with CLI execution outcome
     """
     try:
-        # Build Claude Code CLI command for file editing
-        cmd = [claude_command, prompt]
+        # Build Claude Code CLI command for file editing with verbose output
+        cmd = [claude_command, "--verbose", prompt]
 
         logging.info(f"Executing Claude Code CLI edit tool for {file_path}")
         logging.debug(f"Command: {' '.join(cmd)}")
+        logging.info(f"Prompt being sent to Claude:\n{prompt}")
 
         # Execute the command in the file's directory so Claude can access the file
         result = subprocess.run(cmd, cwd=file_path.parent, capture_output=True, text=True, timeout=300)  # 5 minute timeout
+
+        # Log Claude's output for debugging
+        if result.stdout:
+            logging.info(f"Claude output:\n{result.stdout}")
+        if result.stderr:
+            logging.info(f"Claude stderr:\n{result.stderr}")
 
         if result.returncode != 0:
             error_msg = f"Claude Code CLI failed with return code {result.returncode}"
