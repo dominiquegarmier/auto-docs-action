@@ -88,4 +88,10 @@ runs:
         # Print output for debugging
         echo "$python_output"
 
+        # Push changes if there were any successful commits
+        if [ $exit_code -eq 0 ] && [ "$files_successful" -gt 0 ]; then
+          echo "Pushing docstring updates to repository..."
+          git push origin HEAD
+        fi
+
         exit $exit_code
