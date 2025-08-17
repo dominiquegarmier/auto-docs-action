@@ -180,6 +180,18 @@ def main() -> int:
             logger.error(f"❌ Failed during commit creation: {e}", exc_info=True)
             return 1
 
+        # Output GitHub Actions variables
+        github_output = os.getenv("GITHUB_OUTPUT")
+        if github_output:
+            try:
+                with open(github_output, "a") as f:
+                    f.write(f"files_processed={stats['total_files']}\n")
+                    f.write(f"files_successful={stats['successful']}\n")
+                    f.write(f"files_failed={stats['failed']}\n")
+                logger.info("✅ GitHub Actions outputs set")
+            except Exception as e:
+                logger.warning(f"Could not set GitHub Actions outputs: {e}")
+
         # Report final status
         logger.info("🏁 Reporting final status...")
         if stats["failed"] > 0:

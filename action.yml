@@ -73,47 +73,22 @@ runs:
         # Run the action in the target repository directory
         cd $GITHUB_WORKSPACE
         echo "🔍 Starting auto-docs action..."
-        echo "Working directory: $(pwd)"
-        echo "Python executable: ${{ github.action_path }}/.venv/bin/python"
-        echo "Script path: ${{ github.action_path }}/main.py"
-
-        # Test Python executable and environment
-        echo "Testing Python executable..."
-        ${{ github.action_path }}/.venv/bin/python --version || echo "Python version check failed"
-        echo "Testing script file exists..."
-        ls -la ${{ github.action_path }}/main.py || echo "Script file not found"
-        echo "Environment check:"
-        echo "  PWD: $PWD"
-        echo "  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+SET}"
-        echo "  CLAUDE_COMMAND: $CLAUDE_COMMAND"
-        echo "  MAX_RETRIES: $MAX_RETRIES"
-
-        # Run simple debug script first
-        echo "Running simple script..."
-        ${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main_simple.py
-
-        echo "Now running real script..."
-        python_output=$(${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main.py 2>&1 || true)
+        # Run the Python script with real-time output
+        echo "🚀 Running auto-docs script..."
+        ${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main.py
         exit_code=$?
 
-        # Print output for debugging FIRST (regardless of exit code)
-        echo "📋 Python script output:"
-        echo "$python_output"
         echo ""
         echo "📊 Python script exit code: $exit_code"
 
-        # Extract statistics from output
-        files_processed=$(echo "$python_output" | grep -o "total_files': [0-9]*" | grep -o "[0-9]*" || echo "0")
-        files_successful=$(echo "$python_output" | grep -o "successful': [0-9]*" | grep -o "[0-9]*" || echo "0")
-        files_failed=$(echo "$python_output" | grep -o "failed': [0-9]*" | grep -o "[0-9]*" || echo "0")
+        # Python script handles setting GitHub Actions outputs directly
 
-        # Set outputs
-        echo "files_processed=$files_processed" >> $GITHUB_OUTPUT
-        echo "files_successful=$files_successful" >> $GITHUB_OUTPUT
-        echo "files_failed=$files_failed" >> $GITHUB_OUTPUT
-
-        # Push changes if there were any successful commits
-        if [ $exit_code -eq 0 ] && [ "$files_successful" -gt 0 ]; then
+        # Push changes if script succeeded and created commits
+        if [ $exit_code -eq 0 ]; then
+          # Check if there are any commits to push
+          if git diff --quiet HEAD~1 2>/dev/null; then
+            echo "No new commits to push"
+          else
           # Safety check: Verify this is still the latest commit before pushing
           BRANCH="${GITHUB_REF_NAME}"
           CURRENT_REMOTE_SHA=$(git ls-remote origin refs/heads/$BRANCH | awk '{print $1}')
@@ -122,8 +97,11 @@ runs:
             exit 0
           fi
 
-          echo "Pushing docstring updates to repository..."
-          git push origin HEAD
+            echo "Pushing docstring updates to repository..."
+            git push origin HEAD
+          fi
+        else
+          echo "Python script failed, not pushing changes"
         fi
 
         exit $exit_code
