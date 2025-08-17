@@ -118,8 +118,8 @@ def _execute_claude_cli(prompt: str, file_path: Path, claude_command: str) -> Do
         DocstringUpdateResult with CLI execution outcome
     """
     try:
-        # Build Claude Code CLI command with explicit permission to use Edit tool
-        cmd = [claude_command, "--verbose", "--allowedTools", "Edit", prompt]
+        # Build Claude Code CLI command with print mode, permissions, and JSON output
+        cmd = [claude_command, "-p", prompt, "--verbose", "--output-format", "json", "--allowedTools", "Edit", "Read"]
 
         logging.info(f"Executing Claude Code CLI edit tool for {file_path}")
         logging.debug(f"Command: {' '.join(cmd)}")
@@ -128,16 +128,24 @@ def _execute_claude_cli(prompt: str, file_path: Path, claude_command: str) -> Do
         # Execute the command in the file's directory so Claude can access the file
         result = subprocess.run(cmd, cwd=file_path.parent, capture_output=True, text=True, timeout=300)  # 5 minute timeout
 
-        # Log Claude's output for debugging
+        # Always log Claude's output and errors for debugging
+        logging.info(f"Claude CLI return code: {result.returncode}")
         if result.stdout:
-            logging.info(f"Claude output:\n{result.stdout}")
+            logging.info(f"Claude stdout:\n{result.stdout}")
+        else:
+            logging.info("Claude stdout: (empty)")
+
         if result.stderr:
-            logging.info(f"Claude stderr:\n{result.stderr}")
+            logging.error(f"Claude stderr:\n{result.stderr}")
+        else:
+            logging.info("Claude stderr: (empty)")
 
         if result.returncode != 0:
             error_msg = f"Claude Code CLI failed with return code {result.returncode}"
             if result.stderr:
                 error_msg += f": {result.stderr.strip()}"
+            elif result.stdout:
+                error_msg += f". Output: {result.stdout.strip()}"
 
             logging.error(error_msg)
             return DocstringUpdateResult(success=False, error_message=error_msg)
