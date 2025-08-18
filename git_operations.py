@@ -109,37 +109,47 @@ def get_pr_base_commit() -> str | None:
             logging.debug(f"Not in PR context (event: {github_event_name})")
             return None
 
-        # Get base SHA from GitHub Actions environment
-        base_sha = os.getenv("GITHUB_BASE_REF")
-        if not base_sha:
-            logging.debug("GITHUB_BASE_REF not found, trying alternative methods")
-            # Try to get it from git if available
+        # In PR context, try to get the base commit from environment variables
+        # GitHub Actions provides the base SHA directly
+        github_event_before = os.getenv("GITHUB_EVENT_BEFORE")
+        if github_event_before and github_event_before != "0000000000000000000000000000000000000000":
             try:
-                _, stdout, _ = cmd_output("git", "merge-base", "HEAD", "origin/main")
-                base_sha = stdout.strip()
-                if base_sha:
-                    logging.info(f"✅ Found PR base commit via merge-base: {base_sha[:8]}")
-                    return base_sha
-            except CalledProcessError:
-                pass
-            return None
-
-        # Convert branch name to commit SHA if needed
-        try:
-            _, stdout, _ = cmd_output("git", "rev-parse", f"origin/{base_sha}")
-            commit_sha = stdout.strip()
-            logging.info(f"✅ Found PR base commit: {commit_sha[:8]} (from branch {base_sha})")
-            return commit_sha
-        except CalledProcessError:
-            logging.debug(f"Could not resolve origin/{base_sha}, trying without origin/")
-            try:
-                _, stdout, _ = cmd_output("git", "rev-parse", base_sha)
+                # Verify this commit exists
+                _, stdout, _ = cmd_output("git", "rev-parse", github_event_before)
                 commit_sha = stdout.strip()
-                logging.info(f"✅ Found PR base commit: {commit_sha[:8]} (from {base_sha})")
+                logging.info(f"✅ Found PR base commit from GITHUB_EVENT_BEFORE: {commit_sha[:8]}")
                 return commit_sha
-            except CalledProcessError as e:
-                logging.debug(f"Could not resolve base ref {base_sha}: {e}")
-                return None
+            except CalledProcessError:
+                logging.debug(f"GITHUB_EVENT_BEFORE commit {github_event_before} not available")
+
+        # Try using merge base with HEAD if we have multiple parents (merge commit)
+        try:
+            # Check if HEAD is a merge commit
+            _, stdout, _ = cmd_output("git", "rev-parse", "HEAD^2", check=False)
+            if stdout.strip():
+                # This is a merge commit, get the first parent (base branch)
+                _, stdout, _ = cmd_output("git", "rev-parse", "HEAD^1")
+                commit_sha = stdout.strip()
+                logging.info(f"✅ Found PR base commit from merge commit first parent: {commit_sha[:8]}")
+                return commit_sha
+        except CalledProcessError:
+            pass
+
+        # Try to use git log to find a reasonable base
+        try:
+            # Get commits reachable from HEAD, in reverse order
+            _, stdout, _ = cmd_output("git", "rev-list", "--reverse", "HEAD")
+            commits = [line.strip() for line in stdout.strip().split("\n") if line.strip()]
+            if len(commits) > 1:
+                # Use the second commit as base (first would be the oldest)
+                base_commit = commits[1]
+                logging.info(f"✅ Found PR base commit from commit history: {base_commit[:8]}")
+                return base_commit
+        except CalledProcessError:
+            pass
+
+        logging.debug("Could not determine PR base commit, will fall back to bot commit")
+        return None
 
     except Exception as e:
         logging.error(f"❌ Unexpected error in get_pr_base_commit: {e}", exc_info=True)

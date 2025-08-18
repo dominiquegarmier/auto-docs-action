@@ -89,16 +89,28 @@ runs:
           if git diff --quiet HEAD~1 2>/dev/null; then
             echo "No new commits to push"
           else
-          # Safety check: Verify this is still the latest commit before pushing
-          BRANCH="${GITHUB_REF_NAME}"
-          CURRENT_REMOTE_SHA=$(git ls-remote origin refs/heads/$BRANCH | awk '{print $1}')
-          if [ "$CURRENT_REMOTE_SHA" != "$GITHUB_SHA" ]; then
-            echo "This is not the latest commit on $BRANCH. Another commit was pushed while processing. Exiting safely."
-            exit 0
-          fi
+            # Determine the correct branch to push to
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              BRANCH="${GITHUB_HEAD_REF}"
+              echo "📝 Pushing docstring updates to PR branch: $BRANCH..."
+            else
+              BRANCH="${GITHUB_REF_NAME}"
+              echo "📝 Pushing docstring updates to branch: $BRANCH..."
+            fi
 
-            echo "Pushing docstring updates to repository..."
-            git push origin HEAD
+            # For PRs, we push directly to the head branch
+            # For pushes, we use the safety check
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              git push origin HEAD:$BRANCH
+            else
+              # Safety check for push events: Verify this is still the latest commit
+              CURRENT_REMOTE_SHA=$(git ls-remote origin refs/heads/$BRANCH | awk '{print $1}')
+              if [ "$CURRENT_REMOTE_SHA" != "$GITHUB_SHA" ]; then
+                echo "This is not the latest commit on $BRANCH. Another commit was pushed while processing. Exiting safely."
+                exit 0
+              fi
+              git push origin HEAD
+            fi
           fi
         else
           echo "Python script failed, not pushing changes"

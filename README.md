@@ -46,7 +46,8 @@ jobs:
         uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 32  # Need history for git diff
+          ref: ${{ github.head_ref || github.ref }}  # Checkout PR branch or push branch
+          fetch-depth: 32  # Need history for git diff (increase if you have more than 32 commits between auto-docs runs)
 
       - name: Auto-update docstrings
         uses: dominiquegarmier/auto-docs-action@main
@@ -60,7 +61,7 @@ jobs:
 1. **Get Anthropic API Key**: Sign up at [console.anthropic.com](https://console.anthropic.com) and create an API key
 2. **Add Secret**: Go to your repository Settings → Secrets and variables → Actions, and add `ANTHROPIC_API_KEY`
 3. **Add Workflow**: Create the workflow file above in your repository
-4. **Push Changes**: The action will trigger on Python file changes
+4. **Push Changes**: The action will trigger on Python file changes and automatically push docstring updates
 
 ## Configuration
 
@@ -87,6 +88,7 @@ jobs:
 3. **Processing**: Sends files to Claude Code CLI with context-aware prompts
 4. **Validation**: Uses AST parsing to ensure only docstrings were modified
 5. **Commit**: Creates a commit with updated docstrings and pushes back to the repository
+6. **Auto-fix PRs**: For pull requests, automatically pushes updates to the PR branch (like pre-commit.ci)
 
 ### First Run
 
@@ -95,7 +97,8 @@ On the first run (no previous auto-docs commits), the action processes all Pytho
 ### Smart Diff Detection
 
 The action uses intelligent diff detection:
-- Compares against the last commit made by `github-actions[bot]`
+- **Push to main**: Compares against the last commit made by `github-actions[bot]`
+- **Pull requests**: Compares against PR base commit or last bot commit (whichever has less history)
 - Handles multiple commits between auto-docs runs
 - Prevents processing unchanged files for efficiency
 
