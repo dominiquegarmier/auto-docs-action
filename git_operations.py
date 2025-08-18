@@ -61,11 +61,11 @@ def cmd_output(*cmd: str, cwd: str | None = None, check: bool = True, timeout: i
         raise CalledProcessError(error_msg) from e
 
 
-def get_last_auto_docs_commit() -> str | None:
-    """Get the SHA of the last commit made by github-actions[bot] for auto-docs.
+def get_last_bot_commit() -> str | None:
+    """Get the SHA of the last commit made by github-actions[bot].
 
     Returns:
-        The commit SHA if found, None if no auto-docs commits exist
+        The commit SHA if found, None if no bot commits exist
     """
     try:
         logging.info("🔍 Searching for last github-actions commit...")
@@ -92,8 +92,192 @@ def get_last_auto_docs_commit() -> str | None:
         logging.info(f"ℹ️ No previous github-actions commits found or git error: {e}")
         return None
     except Exception as e:
-        logging.error(f"❌ Unexpected error in get_last_auto_docs_commit: {e}", exc_info=True)
+        logging.error(f"❌ Unexpected error in get_last_bot_commit: {e}", exc_info=True)
         return None
+
+
+def get_pr_base_commit() -> str | None:
+    """Get PR base commit from GitHub Actions environment variables.
+
+    Returns:
+        The PR base commit SHA if in PR context, None otherwise
+    """
+    try:
+        # Check if we're in a pull request context
+        github_event_name = os.getenv("GITHUB_EVENT_NAME")
+        if github_event_name != "pull_request":
+            logging.debug(f"Not in PR context (event: {github_event_name})")
+            return None
+
+        # Get base SHA from GitHub Actions environment
+        base_sha = os.getenv("GITHUB_BASE_REF")
+        if not base_sha:
+            logging.debug("GITHUB_BASE_REF not found, trying alternative methods")
+            # Try to get it from git if available
+            try:
+                _, stdout, _ = cmd_output("git", "merge-base", "HEAD", "origin/main")
+                base_sha = stdout.strip()
+                if base_sha:
+                    logging.info(f"✅ Found PR base commit via merge-base: {base_sha[:8]}")
+                    return base_sha
+            except CalledProcessError:
+                pass
+            return None
+
+        # Convert branch name to commit SHA if needed
+        try:
+            _, stdout, _ = cmd_output("git", "rev-parse", f"origin/{base_sha}")
+            commit_sha = stdout.strip()
+            logging.info(f"✅ Found PR base commit: {commit_sha[:8]} (from branch {base_sha})")
+            return commit_sha
+        except CalledProcessError:
+            logging.debug(f"Could not resolve origin/{base_sha}, trying without origin/")
+            try:
+                _, stdout, _ = cmd_output("git", "rev-parse", base_sha)
+                commit_sha = stdout.strip()
+                logging.info(f"✅ Found PR base commit: {commit_sha[:8]} (from {base_sha})")
+                return commit_sha
+            except CalledProcessError as e:
+                logging.debug(f"Could not resolve base ref {base_sha}: {e}")
+                return None
+
+    except Exception as e:
+        logging.error(f"❌ Unexpected error in get_pr_base_commit: {e}", exc_info=True)
+        return None
+
+
+def get_oldest_available_commit() -> str:
+    """Get the oldest commit available in the repository (handles shallow checkout).
+
+    Returns:
+        The oldest commit SHA available
+
+    Raises:
+        CalledProcessError: If no commits are found
+    """
+    try:
+        # Try to get the first commit (root commit)
+        _, stdout, _ = cmd_output("git", "rev-list", "--max-parents=0", "HEAD")
+        first_commit = stdout.strip()
+        if first_commit:
+            logging.info(f"✅ Found first commit: {first_commit[:8]}")
+            return first_commit
+    except CalledProcessError:
+        logging.debug("Could not find first commit, trying reverse order")
+
+    try:
+        # Fallback for shallow checkout: get oldest available commit
+        _, stdout, _ = cmd_output("git", "rev-list", "--max-count=1", "--reverse", "HEAD")
+        oldest_commit = stdout.strip()
+        if oldest_commit:
+            logging.info(f"✅ Found oldest available commit: {oldest_commit[:8]}")
+            return oldest_commit
+    except CalledProcessError:
+        logging.debug("Could not find oldest commit, using HEAD")
+
+    # Ultimate fallback: use HEAD (no diff will be generated)
+    _, stdout, _ = cmd_output("git", "rev-parse", "HEAD")
+    head_commit = stdout.strip()
+    logging.warning(f"⚠️ Using HEAD as oldest commit: {head_commit[:8]}")
+    return head_commit
+
+
+def count_commits_to_head(commit: str) -> int:
+    """Count the number of commits from given commit to HEAD.
+
+    Args:
+        commit: The commit SHA to count from
+
+    Returns:
+        Number of commits from commit to HEAD (0 if commit is HEAD)
+        Returns a very large number if count cannot be determined
+    """
+    try:
+        _, stdout, _ = cmd_output("git", "rev-list", "--count", f"{commit}..HEAD")
+        count = int(stdout.strip())
+        logging.debug(f"Commit {commit[:8]} is {count} commits behind HEAD")
+        return count
+    except (CalledProcessError, ValueError) as e:
+        logging.debug(f"Could not count commits for {commit}: {e}")
+        return 999999  # Return large number if we can't count (treat as very old)
+
+
+def determine_diff_commits() -> tuple[str, str]:
+    """Determine the from and to commits for diff operations.
+
+    Logic:
+    - PR context: min_history(pr_base, last_bot) or oldest_available
+    - Push context: min_history(oldest_available, last_bot)
+
+    Returns:
+        Tuple of (from_commit, to_commit) where to_commit is always HEAD
+    """
+    try:
+        logging.info("🔍 Determining diff commits...")
+
+        # Always diff to HEAD
+        to_commit = "HEAD"
+
+        # Check if we're in PR context
+        github_event_name = os.getenv("GITHUB_EVENT_NAME")
+        is_pr = github_event_name == "pull_request"
+
+        logging.info(f"Context: {'PR' if is_pr else 'Push'} (GITHUB_EVENT_NAME={github_event_name})")
+
+        if is_pr:
+            # PR context: min(pr_base, last_bot) or oldest_available
+            pr_base = get_pr_base_commit()
+            last_bot = get_last_bot_commit()
+
+            if pr_base and last_bot:
+                # Choose the one with fewer commits to HEAD (less history)
+                pr_base_count = count_commits_to_head(pr_base)
+                last_bot_count = count_commits_to_head(last_bot)
+
+                if pr_base_count <= last_bot_count:
+                    from_commit = pr_base
+                    logging.info(f"Using PR base commit: {from_commit[:8]} ({pr_base_count} commits to HEAD)")
+                else:
+                    from_commit = last_bot
+                    logging.info(f"Using last bot commit: {from_commit[:8]} ({last_bot_count} commits to HEAD)")
+            elif pr_base:
+                from_commit = pr_base
+                logging.info(f"Using PR base commit (no bot history): {from_commit[:8]}")
+            elif last_bot:
+                from_commit = last_bot
+                logging.info(f"Using last bot commit (no PR base): {from_commit[:8]}")
+            else:
+                from_commit = get_oldest_available_commit()
+                logging.info(f"No PR base or bot history, using oldest available: {from_commit[:8]}")
+        else:
+            # Push context: min(oldest_available, last_bot)
+            oldest_available = get_oldest_available_commit()
+            last_bot = get_last_bot_commit()
+
+            if last_bot:
+                # Choose the one with fewer commits to HEAD (less history)
+                oldest_count = count_commits_to_head(oldest_available)
+                last_bot_count = count_commits_to_head(last_bot)
+
+                if oldest_count <= last_bot_count:
+                    from_commit = oldest_available
+                    logging.info(f"Using oldest available commit: {from_commit[:8]} ({oldest_count} commits to HEAD)")
+                else:
+                    from_commit = last_bot
+                    logging.info(f"Using last bot commit: {from_commit[:8]} ({last_bot_count} commits to HEAD)")
+            else:
+                from_commit = oldest_available
+                logging.info(f"No bot history, using oldest available: {from_commit[:8]}")
+
+        logging.info(f"✅ Diff range determined: {from_commit[:8]}..{to_commit}")
+        return from_commit, to_commit
+
+    except Exception as e:
+        logging.error(f"❌ Error determining diff commits: {e}", exc_info=True)
+        # Safe fallback: use HEAD (will result in no diff)
+        head_commit = "HEAD"
+        logging.warning(f"⚠️ Falling back to HEAD..HEAD (no diff): {head_commit[:8]}")
+        return head_commit, head_commit
 
 
 def get_changed_py_files() -> list[Path]:
@@ -107,38 +291,53 @@ def get_changed_py_files() -> list[Path]:
     try:
         logging.info("🔍 Starting get_changed_py_files...")
 
-        # Find the last github-actions commit
-        logging.info("🔍 Looking for last github-actions commit...")
-        last_auto_docs = get_last_auto_docs_commit()
-        logging.info(f"✅ get_last_auto_docs_commit returned: {last_auto_docs}")
+        # Use central diff logic
+        from_commit, to_commit = determine_diff_commits()
+        # Get changed files using central diff logic
+        if from_commit == to_commit:
+            # No diff to compute, return empty list
+            logging.info("No diff range available, no files to process")
+            py_files: list[Path] = []
+        else:
+            # Check if we should return ALL files (no bot/PR history)
+            github_event_name = os.getenv("GITHUB_EVENT_NAME")
+            is_pr = github_event_name == "pull_request"
 
-        if last_auto_docs:
-            # Diff from last github-actions commit to HEAD
-            logging.info(f"🔍 Diffing from {last_auto_docs[:8]} to HEAD...")
-            _, stdout, _ = cmd_output("git", "diff", "--name-only", last_auto_docs, "HEAD")
-            logging.info(f"Comparing against last github-actions commit: {last_auto_docs[:8]}")
-            logging.info(f"Git diff output: {repr(stdout[:200])}...")
+            should_return_all_files = False
+            if is_pr:
+                # In PR: return all files if neither PR base nor bot commit found
+                pr_base = get_pr_base_commit()
+                last_bot = get_last_bot_commit()
+                should_return_all_files = pr_base is None and last_bot is None
+            else:
+                # In push: return all files if no bot commit found
+                last_bot = get_last_bot_commit()
+                should_return_all_files = last_bot is None
 
-            py_files = []
-            for line in stdout.strip().split("\n"):
-                if line and line.endswith(".py"):
-                    if Path(line).exists():
+            if should_return_all_files:
+                # First run or no relevant history - return ALL Python files
+                logging.info("No relevant commit history found, returning all Python files")
+                _, stdout, _ = cmd_output("git", "ls-files", "*.py")
+                logging.info(f"Git ls-files output: {repr(stdout[:200])}...")
+
+                py_files = []
+                for line in stdout.strip().split("\n"):
+                    if line and Path(line).exists():
                         py_files.append(Path(line))
                         logging.debug(f"Added Python file: {line}")
-                    else:
-                        logging.debug(f"Skipped non-existent file: {line}")
-        else:
-            # Fallback: get ALL Python files in the repository (first run)
-            logging.info("🔍 No github-actions history, listing all Python files...")
-            _, stdout, _ = cmd_output("git", "ls-files", "*.py")
-            logging.info("No previous github-actions commits found, processing all Python files")
-            logging.info(f"Git ls-files output: {repr(stdout[:200])}...")
+            else:
+                # Normal case - diff between commits
+                _, stdout, _ = cmd_output("git", "diff", "--name-only", from_commit, to_commit)
+                logging.info(f"Git diff {from_commit[:8]}..{to_commit}: {repr(stdout[:200])}...")
 
-            py_files = []
-            for line in stdout.strip().split("\n"):
-                if line and Path(line).exists():
-                    py_files.append(Path(line))
-                    logging.debug(f"Added Python file: {line}")
+                py_files = []
+                for line in stdout.strip().split("\n"):
+                    if line and line.endswith(".py"):
+                        if Path(line).exists():
+                            py_files.append(Path(line))
+                            logging.debug(f"Added Python file: {line}")
+                        else:
+                            logging.debug(f"Skipped non-existent file: {line}")
 
         logging.info(f"Found {len(py_files)} Python files to process: {[str(f) for f in py_files]}")
         return py_files
@@ -152,9 +351,7 @@ def get_changed_py_files() -> list[Path]:
 
 
 def get_file_diff(file_path: Path) -> str:
-    """Get git diff for specific file since the last github-actions[bot] commit.
-
-    If no github-actions commits exist, returns diff from first commit to HEAD.
+    """Get git diff for specific file using central diff logic.
 
     Args:
         file_path: Path to the file to get diff for
@@ -163,35 +360,17 @@ def get_file_diff(file_path: Path) -> str:
         Git diff output as string, empty string if error
     """
     try:
-        # Find the last github-actions commit
-        last_auto_docs = get_last_auto_docs_commit()
+        # Use central diff logic
+        from_commit, to_commit = determine_diff_commits()
 
-        if last_auto_docs:
-            # Diff from last github-actions commit to HEAD
-            _, stdout, _ = cmd_output("git", "diff", last_auto_docs, "HEAD", str(file_path))
-            return stdout
-        else:
-            # No github-actions history - diff from first commit to HEAD
-            try:
-                # Get the first commit in the repository
-                _, first_commit, _ = cmd_output("git", "rev-list", "--max-parents=0", "HEAD")
-                first_commit = first_commit.strip()
+        if from_commit == to_commit:
+            # No diff to compute
+            logging.debug(f"No diff range for {file_path}")
+            return ""
 
-                # Diff from first commit to HEAD for this file
-                _, stdout, _ = cmd_output("git", "diff", first_commit, "HEAD", str(file_path))
-                logging.debug(f"No github-actions history, showing full diff for {file_path} from first commit")
-                return stdout
-            except CalledProcessError:
-                # Fallback: if we can't find first commit, show the entire file as added
-                try:
-                    _, stdout, _ = cmd_output("git", "show", f"HEAD:{file_path}")
-                    # Format as a diff showing the entire file as added
-                    lines = stdout.split("\n")
-                    diff_lines = ["--- /dev/null", f"+++ b/{file_path}"] + [f"+{line}" for line in lines]
-                    return "\n".join(diff_lines)
-                except CalledProcessError:
-                    logging.warning(f"Could not generate diff for {file_path}")
-                    return ""
+        # Generate diff for this specific file
+        _, stdout, _ = cmd_output("git", "diff", from_commit, to_commit, str(file_path))
+        return stdout
 
     except CalledProcessError as e:
         logging.error(f"Failed to get diff for {file_path}: {e}")

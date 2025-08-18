@@ -22,6 +22,10 @@ on:
   push:
     branches: [ main ]
     paths: [ '**.py' ]
+  pull_request:
+    types: [ opened, synchronize ]
+    branches: [ main ]
+    paths: [ '**.py' ]
   workflow_dispatch: # Allow manual triggering
 
 # Cancel older runs if new commits are pushed
