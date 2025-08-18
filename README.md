@@ -4,13 +4,13 @@ Automatically update Python docstrings using Claude Code CLI. This GitHub Action
 
 ## Features
 
-- **🔍 Smart Detection**: Only processes files that have changed since the last auto-docs commit
-- **🤖 AI-Powered**: Uses Claude Code CLI to generate high-quality, context-aware docstrings
-- **✅ Safe Updates**: AST validation ensures only docstrings are modified, never function logic
-- **🔄 Retry Logic**: Automatic retries with file restoration for reliability
-- **📊 Real-time Logs**: See processing progress live in GitHub Actions
-- **🔀 Multi-file Support**: Processes multiple files concurrently with proper error handling
-- **🌐 Smart Git Handling**: Automatically fetches PR base branches for accurate diff detection
+- Smart detection: Only processes files changed since the last auto-docs commit
+- AI-powered: Uses Claude Code CLI to generate high-quality, context-aware docstrings
+- Safe updates: AST validation ensures only docstrings are modified, never function logic
+- Retry logic: Automatic retries with file restoration for reliability
+- Real-time logs: See processing progress live in GitHub Actions
+- Multi-file support: Processes multiple files concurrently with proper error handling
+- Smart git handling: Automatically fetches PR base branches for accurate diff detection
 
 ## Quick Start
 
@@ -29,7 +29,6 @@ on:
     paths: ["**.py"]
   workflow_dispatch: # Allow manual triggering
 
-# Cancel older runs if new commits are pushed
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -59,10 +58,10 @@ jobs:
 
 ## Setup
 
-1. **Get Anthropic API Key**: Sign up at [console.anthropic.com](https://console.anthropic.com) and create an API key
-2. **Add Secret**: Go to your repository Settings → Secrets and variables → Actions, and add `ANTHROPIC_API_KEY`
-3. **Add Workflow**: Create the workflow file above in your repository
-4. **Push Changes**: The action will trigger on Python file changes and automatically push docstring updates
+1. Get an Anthropic API key at [console.anthropic.com](https://console.anthropic.com)
+2. Add `ANTHROPIC_API_KEY` to your repository secrets (Settings → Secrets and variables → Actions)
+3. Add the workflow file above to your repository
+4. The action will trigger on Python file changes and automatically push docstring updates
 
 ## Configuration
 
@@ -84,31 +83,26 @@ jobs:
 
 ## How It Works
 
-1. **Detection**: Identifies Python files changed since the last `github-actions[bot]` commit
-2. **Analysis**: For each file, generates a git diff to understand what changed
-3. **Processing**: Sends files to Claude Code CLI with context-aware prompts
-4. **Validation**: Uses AST parsing to ensure only docstrings were modified
-5. **Commit**: Creates a commit with updated docstrings and pushes back to the repository
-6. **Auto-fix PRs**: For pull requests, automatically pushes updates to the PR branch (like pre-commit.ci)
-7. **Smart Checkout**: Automatically ensures PR base branches are available for accurate diff detection
+1. Detects Python files changed since the last `github-actions[bot]` commit
+2. Generates git diff for each file to understand what changed
+3. Sends files to Claude Code CLI with context-aware prompts
+4. Validates changes using AST parsing to ensure only docstrings were modified
+5. Creates commit with updated docstrings and pushes back to repository
+6. For pull requests, automatically pushes updates to PR branch (like pre-commit.ci)
+7. Automatically ensures PR base branches are available for accurate diff detection
 
 ### First Run
 
-On the first run (no previous auto-docs commits), the action processes all Python files in the repository to establish a baseline of documented code.
+On the first run, the action processes all Python files to establish a baseline of documented code.
 
-### Smart Diff Detection
+### Diff Detection
 
-The action uses intelligent diff detection:
+- Push events: Compares against the last `github-actions[bot]` commit
+- Pull requests: Compares against PR base commit or last bot commit (whichever has less history)
+- Handles multiple commits between runs
+- Automatically fetches PR base branches when needed
 
-- **Push to main**: Compares against the last commit made by `github-actions[bot]`
-- **Pull requests**: Compares against PR base commit or last bot commit (whichever has less history)
-- **Automatic base branch fetching**: Ensures PR base branches are available even with shallow checkouts
-- Handles multiple commits between auto-docs runs
-- Prevents processing unchanged files for efficiency
-
-## Example Output
-
-The action generates comprehensive Google-style docstrings:
+## Example
 
 ```python
 # Before
@@ -129,25 +123,9 @@ def calculate_total(items, tax_rate):
     return sum(items) * (1 + tax_rate)
 ```
 
-## Safety & Validation
+## Safety
 
-- **AST Validation**: Mathematically proves only docstrings were changed
-- **Syntax Checking**: Ensures all modifications result in valid Python
-- **File Restoration**: Automatically restores files if validation fails
-- **Retry Logic**: Up to 3 attempts per file with clean state between tries
-- **Race Condition Protection**: Checks for concurrent commits before pushing
-
-## Limitations
-
-- Requires Anthropic API key (Claude usage costs apply)
-- Only processes Python files (`.py` extension)
-- Designed for Google-style docstrings
-- Requires `contents: write` permission for commits
-
-## Contributing
-
-Issues and pull requests are welcome! Please ensure all tests pass and follow the existing code style.
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
+- AST validation ensures only docstrings are changed
+- Syntax checking for all modifications
+- Automatic file restoration if validation fails
+- Race condition protection before pushing
