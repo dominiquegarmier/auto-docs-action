@@ -125,10 +125,3 @@ def calculate_total(items, tax_rate):
     """
     return sum(items) * (1 + tax_rate)
 ```
-
-## Safety
-
-- AST validation ensures only docstrings are changed
-- Syntax checking for all modifications
-- Automatic file restoration if validation fails
-- Race condition protection before pushing
