@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
-import git_operations
-import main
+from auto_docs_action import git_operations
+from auto_docs_action.main import main_for_testing
 
 
 def test_empty_repository_handling():
@@ -125,7 +125,7 @@ def test_claude_cli_timeout_handling(mock_run):
     """Test handling of Claude CLI timeouts."""
     import subprocess
 
-    from docstring_updater import _execute_claude_cli
+    from auto_docs_action.docstring_updater import _execute_claude_cli
 
     # Mock timeout
     mock_run.side_effect = subprocess.TimeoutExpired("claude", 300)
@@ -142,7 +142,7 @@ def test_claude_cli_permission_denied(mock_run):
     """Test handling of permission denied errors."""
     from unittest.mock import MagicMock
 
-    from docstring_updater import _execute_claude_cli
+    from auto_docs_action.docstring_updater import _execute_claude_cli
 
     # Mock permission denied
     mock_run.side_effect = PermissionError("Permission denied")
@@ -187,7 +187,7 @@ def test_concurrent_git_operations():
 
 def test_environment_variable_handling():
     """Test handling of various environment variable configurations."""
-    import main
+    from auto_docs_action.main import main
 
     # Test with missing environment variables
     old_env = os.environ.copy()
@@ -223,10 +223,10 @@ def test_main_with_no_changed_files():
 
             # Should exit cleanly with no files to process
             with (
-                patch("git_operations.get_changed_py_files", return_value=[]),
+                patch("auto_docs_action.git_operations.get_changed_py_files", return_value=[]),
                 patch("shutil.which", return_value="/fake/claude"),
             ):
-                exit_code = main.main()
+                exit_code = main_for_testing()
                 assert exit_code == 0  # Success even with no files
 
         finally:

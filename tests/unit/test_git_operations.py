@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-import git_operations
-from git_operations import CalledProcessError
-from git_operations import cmd_output
+from auto_docs_action import git_operations
+from auto_docs_action.git_operations import CalledProcessError
+from auto_docs_action.git_operations import cmd_output
 
 
 def test_successful_command():

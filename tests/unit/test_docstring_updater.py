@@ -10,8 +10,8 @@ from unittest.mock import patch
 
 import pytest
 
-import docstring_updater
-from docstring_updater import DocstringUpdateResult
+from auto_docs_action import docstring_updater
+from auto_docs_action.docstring_updater import DocstringUpdateResult
 
 
 def test_successful_result_creation():
@@ -136,8 +136,8 @@ def test_execute_claude_cli_exception(mock_run):
     assert "Unexpected error" in result.error_message
 
 
-@patch("git_operations.get_file_diff")
-@patch("docstring_updater._execute_claude_cli")
+@patch("auto_docs_action.git_operations.get_file_diff")
+@patch("auto_docs_action.docstring_updater._execute_claude_cli")
 def test_update_docstrings_success_with_changes(mock_execute, mock_diff):
     """Test successful docstring update with file changes."""
     # Create a temporary file
@@ -178,8 +178,8 @@ def test_update_docstrings_success_with_changes(mock_execute, mock_diff):
         file_path.unlink()
 
 
-@patch("git_operations.get_file_diff")
-@patch("docstring_updater._execute_claude_cli")
+@patch("auto_docs_action.git_operations.get_file_diff")
+@patch("auto_docs_action.docstring_updater._execute_claude_cli")
 def test_update_docstrings_success_no_changes(mock_execute, mock_diff):
     """Test successful docstring update with no file changes."""
     # Create a temporary file
@@ -206,7 +206,7 @@ def test_update_docstrings_success_no_changes(mock_execute, mock_diff):
         file_path.unlink()
 
 
-@patch("git_operations.get_file_diff")
+@patch("auto_docs_action.git_operations.get_file_diff")
 def test_update_docstrings_no_diff(mock_diff):
     """Test docstring update when no git diff is available."""
     # Create a temporary file
@@ -229,8 +229,8 @@ def test_update_docstrings_no_diff(mock_diff):
         file_path.unlink()
 
 
-@patch("git_operations.get_file_diff")
-@patch("docstring_updater._execute_claude_cli")
+@patch("auto_docs_action.git_operations.get_file_diff")
+@patch("auto_docs_action.docstring_updater._execute_claude_cli")
 def test_update_docstrings_cli_failure(mock_execute, mock_diff):
     """Test docstring update with CLI execution failure."""
     # Create a temporary file
@@ -256,7 +256,7 @@ def test_update_docstrings_cli_failure(mock_execute, mock_diff):
         file_path.unlink()
 
 
-@patch("git_operations.get_file_diff")
+@patch("auto_docs_action.git_operations.get_file_diff")
 def test_update_docstrings_file_read_error(mock_diff):
     """Test docstring update with file read error."""
     non_existent_file = Path("/non/existent/file.py")
@@ -270,7 +270,7 @@ def test_update_docstrings_file_read_error(mock_diff):
     assert "Unexpected error" in result.error_message
 
 
-@patch("git_operations.get_file_diff")
+@patch("auto_docs_action.git_operations.get_file_diff")
 def test_update_docstrings_unexpected_exception(mock_diff):
     """Test docstring update with unexpected exception."""
     # Mock to raise exception

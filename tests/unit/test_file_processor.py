@@ -10,10 +10,10 @@ from unittest.mock import patch
 
 import pytest
 
-from ast_validator import ValidationResult
-from docstring_updater import DocstringUpdateResult
-from file_processor import FileProcessor
-from file_processor import ProcessingResult
+from auto_docs_action.ast_validator import ValidationResult
+from auto_docs_action.docstring_updater import DocstringUpdateResult
+from auto_docs_action.file_processor import FileProcessor
+from auto_docs_action.file_processor import ProcessingResult
 
 
 def test_successful_result_creation():
@@ -102,8 +102,8 @@ def test_restore_file_content_failure():
 
 
 @patch("time.sleep")
-@patch("ast_validator.validate_changes")
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.ast_validator.validate_changes")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_file_success_first_attempt(mock_update_docstrings, mock_validate_changes, mock_sleep):
     """Test successful file processing on first attempt."""
     # Mock function returns
@@ -145,8 +145,8 @@ def test_process_file_success_first_attempt(mock_update_docstrings, mock_validat
         file_path.unlink()
 
 
-@patch("ast_validator.validate_changes")
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.ast_validator.validate_changes")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_file_no_changes_needed(mock_update_docstrings, mock_validate_changes):
     """Test processing when no changes are needed."""
     mock_update_docstrings.return_value = DocstringUpdateResult(success=True, updated_content=None)  # No changes needed
@@ -174,8 +174,8 @@ def test_process_file_no_changes_needed(mock_update_docstrings, mock_validate_ch
 
 
 @patch("time.sleep")
-@patch("ast_validator.validate_changes")
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.ast_validator.validate_changes")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_file_docstring_update_failure_with_retry(mock_update_docstrings, mock_validate_changes, mock_sleep):
     """Test processing with docstring update failure and retry."""
     # First attempt fails, second succeeds
@@ -212,8 +212,8 @@ def test_process_file_docstring_update_failure_with_retry(mock_update_docstrings
 
 
 @patch("time.sleep")
-@patch("ast_validator.validate_changes")
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.ast_validator.validate_changes")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_file_validation_failure_with_retry(mock_update_docstrings, mock_validate_changes, mock_sleep):
     """Test processing with validation failure and retry."""
     mock_update_docstrings.return_value = DocstringUpdateResult(
@@ -249,7 +249,7 @@ def test_process_file_validation_failure_with_retry(mock_update_docstrings, mock
 
 
 @patch("time.sleep")
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_file_max_retries_exceeded(mock_update_docstrings, mock_sleep):
     """Test processing failure after max retries exceeded."""
     mock_update_docstrings.return_value = DocstringUpdateResult(success=False, error_message="Persistent error")
@@ -290,7 +290,7 @@ def test_process_file_file_read_error():
     assert result.retry_count == 0
 
 
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_file_file_write_error(mock_update_docstrings):
     """Test processing with file write error."""
     mock_update_docstrings.return_value = DocstringUpdateResult(
@@ -330,7 +330,7 @@ def test_process_file_file_write_error(mock_update_docstrings):
 
 
 @patch("time.sleep")
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_file_unexpected_exception(mock_update_docstrings, mock_sleep):
     """Test processing with unexpected exception."""
     mock_update_docstrings.side_effect = RuntimeError("Unexpected error")
@@ -357,8 +357,8 @@ def test_process_file_unexpected_exception(mock_update_docstrings, mock_sleep):
         file_path.unlink()
 
 
-@patch("ast_validator.validate_changes")
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.ast_validator.validate_changes")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_multiple_files_success(mock_update_docstrings, mock_validate_changes):
     """Test processing multiple files successfully."""
     mock_update_docstrings.return_value = DocstringUpdateResult(
@@ -389,8 +389,8 @@ def test_process_multiple_files_success(mock_update_docstrings, mock_validate_ch
             file_path.unlink()
 
 
-@patch("ast_validator.validate_changes")
-@patch("docstring_updater.update_docstrings")
+@patch("auto_docs_action.ast_validator.validate_changes")
+@patch("auto_docs_action.docstring_updater.update_docstrings")
 def test_process_multiple_files_mixed_results(mock_update_docstrings, mock_validate_changes):
     """Test processing multiple files with mixed results."""
     mock_update_docstrings.side_effect = [

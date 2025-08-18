@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import ast_validator
-import docstring_updater
-from ast_validator import ValidationResult
-from docstring_updater import DocstringUpdateResult
+from auto_docs_action import ast_validator
+from auto_docs_action import docstring_updater
+from auto_docs_action.ast_validator import ValidationResult
+from auto_docs_action.docstring_updater import DocstringUpdateResult
 
 
 @dataclass

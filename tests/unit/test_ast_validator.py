@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import ast_validator
-from ast_validator import ValidationResult
+from auto_docs_action import ast_validator
+from auto_docs_action.ast_validator import ValidationResult
 
 
 def test_valid_docstring_only_change():

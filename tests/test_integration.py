@@ -10,8 +10,8 @@ from unittest.mock import patch
 
 import pytest
 
-import main
-from file_processor import FileProcessor
+from auto_docs_action.file_processor import FileProcessor
+from auto_docs_action.main import main_for_testing
 
 
 def test_full_workflow_integration():
@@ -64,7 +64,7 @@ class Calculator:
 
             # Run main with mocked Claude CLI execution
             with (
-                patch("docstring_updater._execute_claude_cli") as mock_claude,
+                patch("auto_docs_action.docstring_updater._execute_claude_cli") as mock_claude,
                 patch("shutil.which", return_value="/fake/claude"),
             ):
                 # Configure mock to simulate successful Claude execution that adds docstrings
@@ -122,12 +122,12 @@ def divide(a, b):
     return a / b
 '''
                     file_path.write_text(content_with_docstrings)
-                    from docstring_updater import DocstringUpdateResult
+                    from auto_docs_action.docstring_updater import DocstringUpdateResult
 
                     return DocstringUpdateResult(success=True)
 
                 mock_claude.side_effect = side_effect
-                exit_code = main.main()
+                exit_code = main_for_testing()
 
             # Verify results
             assert exit_code == 0  # Should succeed
@@ -178,7 +178,7 @@ def test_workflow_with_validation_failure():
             os.environ["ANTHROPIC_API_KEY"] = "test-key"
 
             # Should handle validation failure gracefully
-            with patch("docstring_updater._execute_claude_cli") as mock_claude:
+            with patch("auto_docs_action.docstring_updater._execute_claude_cli") as mock_claude:
                 # Configure mock to simulate Claude making logic changes that fail validation
                 def side_effect(prompt, file_path, claude_command):
                     # Simulate Claude making logic changes (should fail validation)
@@ -187,12 +187,12 @@ def test_workflow_with_validation_failure():
     return a * b  # Changed logic! Should fail validation
 '''
                     file_path.write_text(bad_content)
-                    from docstring_updater import DocstringUpdateResult
+                    from auto_docs_action.docstring_updater import DocstringUpdateResult
 
                     return DocstringUpdateResult(success=True)
 
                 mock_claude.side_effect = side_effect
-                exit_code = main.main()
+                exit_code = main_for_testing()
 
             # Should report failures but not crash
             assert exit_code == 1  # Failure exit code due to failed processing
@@ -213,7 +213,7 @@ def test_processor_retry_logic():
 
     try:
         # Mock failing docstring update
-        with patch("docstring_updater.update_docstrings") as mock_update:
+        with patch("auto_docs_action.docstring_updater.update_docstrings") as mock_update:
             mock_update.return_value = MagicMock(success=False, error_message="Mock failure")
 
             result = processor.process_file(file_path)
@@ -232,9 +232,9 @@ def test_statistics_calculation():
     processor = FileProcessor()
 
     # Create mock results
-    from ast_validator import ValidationResult
-    from docstring_updater import DocstringUpdateResult
-    from file_processor import ProcessingResult
+    from auto_docs_action.ast_validator import ValidationResult
+    from auto_docs_action.docstring_updater import DocstringUpdateResult
+    from auto_docs_action.file_processor import ProcessingResult
 
     results = [
         ProcessingResult(

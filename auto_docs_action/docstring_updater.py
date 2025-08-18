@@ -7,7 +7,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-import git_operations
+from auto_docs_action import git_operations
 
 # Prompt template for docstring updates using Claude Code CLI edit tool
 DOCSTRING_UPDATE_PROMPT_TEMPLATE = """Please add Google-style docstrings to ALL functions, classes, and methods in \
