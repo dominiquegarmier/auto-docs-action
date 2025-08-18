@@ -92,7 +92,7 @@ runs:
         echo "🔍 Starting auto-docs action..."
         # Run the Python script with real-time output
         echo "🚀 Running auto-docs script..."
-        ${{ github.action_path }}/.venv/bin/python ${{ github.action_path }}/main.py
+        PYTHONPATH=${{ github.action_path }} ${{ github.action_path }}/.venv/bin/python -m auto_docs_action
         exit_code=$?
 
         echo ""
