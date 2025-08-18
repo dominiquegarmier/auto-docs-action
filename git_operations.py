@@ -97,7 +97,7 @@ def get_last_bot_commit() -> str | None:
 
 
 def get_pr_base_commit() -> str | None:
-    """Get PR base commit from GitHub Actions environment variables.
+    """Get the actual PR base commit (merge-base with target branch).
 
     Returns:
         The PR base commit SHA if in PR context, None otherwise
@@ -109,43 +109,55 @@ def get_pr_base_commit() -> str | None:
             logging.debug(f"Not in PR context (event: {github_event_name})")
             return None
 
-        # In PR context, try to get the base commit from environment variables
-        # GitHub Actions provides the base SHA directly
-        github_event_before = os.getenv("GITHUB_EVENT_BEFORE")
-        if github_event_before and github_event_before != "0000000000000000000000000000000000000000":
-            try:
-                # Verify this commit exists
-                _, stdout, _ = cmd_output("git", "rev-parse", github_event_before)
-                commit_sha = stdout.strip()
-                logging.info(f"✅ Found PR base commit from GITHUB_EVENT_BEFORE: {commit_sha[:8]}")
-                return commit_sha
-            except CalledProcessError:
-                logging.debug(f"GITHUB_EVENT_BEFORE commit {github_event_before} not available")
+        # Get the target branch from GitHub environment
+        github_base_ref = os.getenv("GITHUB_BASE_REF")
+        if not github_base_ref:
+            logging.debug("No GITHUB_BASE_REF found, not in PR context")
+            return None
 
-        # Try using merge base with HEAD if we have multiple parents (merge commit)
+        logging.info(f"PR target branch: {github_base_ref}")
+
+        # Try to get merge-base with the actual target branch
         try:
-            # Check if HEAD is a merge commit
-            _, stdout, _ = cmd_output("git", "rev-parse", "HEAD^2", check=False)
+            # First try origin/target_branch
+            target_ref = f"origin/{github_base_ref}"
+            _, stdout, _ = cmd_output("git", "merge-base", "HEAD", target_ref)
+            merge_base = stdout.strip()
+            logging.info(f"✅ Found PR base commit via merge-base with {target_ref}: {merge_base[:8]}")
+            return merge_base
+        except CalledProcessError:
+            try:
+                # Fallback to target_branch without origin prefix
+                _, stdout, _ = cmd_output("git", "merge-base", "HEAD", github_base_ref)
+                merge_base = stdout.strip()
+                logging.info(f"✅ Found PR base commit via merge-base with {github_base_ref}: {merge_base[:8]}")
+                return merge_base
+            except CalledProcessError:
+                logging.debug(f"Could not find merge-base with {github_base_ref}")
+
+        # Fallback: try to find the oldest commit in the current branch
+        # that's not in the target branch history
+        try:
+            # Get the first commit that's unique to this branch
+            boundary_ref = f"HEAD...origin/{github_base_ref}^"
+            _, stdout, _ = cmd_output("git", "rev-list", "--boundary", boundary_ref, check=False)
             if stdout.strip():
-                # This is a merge commit, get the first parent (base branch)
-                _, stdout, _ = cmd_output("git", "rev-parse", "HEAD^1")
-                commit_sha = stdout.strip()
-                logging.info(f"✅ Found PR base commit from merge commit first parent: {commit_sha[:8]}")
-                return commit_sha
+                # Parse boundary commits (marked with -)
+                lines = stdout.strip().split("\n")
+                for line in lines:
+                    if line.startswith("-"):
+                        boundary_commit = line[1:]  # Remove the - prefix
+                        logging.info(f"✅ Found PR base commit from boundary: {boundary_commit[:8]}")
+                        return boundary_commit
         except CalledProcessError:
             pass
 
-        # Try to use git log to find a reasonable base
+        # Last resort: use oldest available commit
         try:
-            # Get commits reachable from HEAD, in reverse order
-            _, stdout, _ = cmd_output("git", "rev-list", "--reverse", "HEAD")
-            commits = [line.strip() for line in stdout.strip().split("\n") if line.strip()]
-            if len(commits) > 1:
-                # Use the second commit as base (first would be the oldest)
-                base_commit = commits[1]
-                logging.info(f"✅ Found PR base commit from commit history: {base_commit[:8]}")
-                return base_commit
-        except CalledProcessError:
+            oldest_commit = get_oldest_available_commit()
+            logging.info(f"✅ Using oldest available commit as PR base: {oldest_commit[:8]}")
+            return oldest_commit
+        except Exception:
             pass
 
         logging.debug("Could not determine PR base commit, will fall back to bot commit")
