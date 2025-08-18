@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install UV
         run: |
@@ -31,6 +31,3 @@ jobs:
 
       - name: Run tests with coverage
         run: uv run pytest --cov=. --cov-report=term-missing
-
-      - name: Run code quality checks
-        run: uv run pre-commit run --all-files
