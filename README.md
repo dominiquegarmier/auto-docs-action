@@ -10,6 +10,7 @@ Automatically update Python docstrings using Claude Code CLI. This GitHub Action
 - **🔄 Retry Logic**: Automatic retries with file restoration for reliability
 - **📊 Real-time Logs**: See processing progress live in GitHub Actions
 - **🔀 Multi-file Support**: Processes multiple files concurrently with proper error handling
+- **🌐 Smart Git Handling**: Automatically fetches PR base branches for accurate diff detection
 
 ## Quick Start
 
@@ -20,12 +21,12 @@ name: Auto-Docs
 
 on:
   push:
-    branches: [ main ]
-    paths: [ '**.py' ]
+    branches: [main]
+    paths: ["**.py"]
   pull_request:
-    types: [ opened, synchronize ]
-    branches: [ main ]
-    paths: [ '**.py' ]
+    types: [opened, synchronize]
+    branches: [main]
+    paths: ["**.py"]
   workflow_dispatch: # Allow manual triggering
 
 # Cancel older runs if new commits are pushed
@@ -46,8 +47,8 @@ jobs:
         uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.head_ref || github.ref }}  # Checkout PR branch or push branch
-          fetch-depth: 32  # Need history for git diff (increase if you have more than 32 commits between auto-docs runs)
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 0
 
       - name: Auto-update docstrings
         uses: dominiquegarmier/auto-docs-action@main
@@ -67,19 +68,19 @@ jobs:
 
 ### Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `anthropic_api_key` | Your Anthropic API key for Claude Code | Yes | - |
-| `max_retries` | Maximum retry attempts per file | No | `2` |
-| `claude_command` | Path to Claude Code CLI executable | No | `claude` |
+| Input               | Description                            | Required | Default  |
+| ------------------- | -------------------------------------- | -------- | -------- |
+| `anthropic_api_key` | Your Anthropic API key for Claude Code | Yes      | -        |
+| `max_retries`       | Maximum retry attempts per file        | No       | `2`      |
+| `claude_command`    | Path to Claude Code CLI executable     | No       | `claude` |
 
 ### Outputs
 
-| Output | Description |
-|--------|-------------|
-| `files_processed` | Total number of Python files processed |
-| `files_successful` | Number of files successfully updated |
-| `files_failed` | Number of files that failed processing |
+| Output             | Description                            |
+| ------------------ | -------------------------------------- |
+| `files_processed`  | Total number of Python files processed |
+| `files_successful` | Number of files successfully updated   |
+| `files_failed`     | Number of files that failed processing |
 
 ## How It Works
 
@@ -89,6 +90,7 @@ jobs:
 4. **Validation**: Uses AST parsing to ensure only docstrings were modified
 5. **Commit**: Creates a commit with updated docstrings and pushes back to the repository
 6. **Auto-fix PRs**: For pull requests, automatically pushes updates to the PR branch (like pre-commit.ci)
+7. **Smart Checkout**: Automatically ensures PR base branches are available for accurate diff detection
 
 ### First Run
 
@@ -97,8 +99,10 @@ On the first run (no previous auto-docs commits), the action processes all Pytho
 ### Smart Diff Detection
 
 The action uses intelligent diff detection:
+
 - **Push to main**: Compares against the last commit made by `github-actions[bot]`
 - **Pull requests**: Compares against PR base commit or last bot commit (whichever has less history)
+- **Automatic base branch fetching**: Ensures PR base branches are available even with shallow checkouts
 - Handles multiple commits between auto-docs runs
 - Prevents processing unchanged files for efficiency
 

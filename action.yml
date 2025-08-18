@@ -63,6 +63,23 @@ runs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+    - name: Ensure PR base branch is available
+      if: ${{ github.event_name == 'pull_request' && github.base_ref != '' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        BASE="${{ github.base_ref }}"
+        echo "🔍 Checking if base branch origin/${BASE} is available..."
+
+        if git rev-parse --verify --quiet "refs/remotes/origin/${BASE}" >/dev/null 2>&1; then
+          echo "✅ Base branch origin/${BASE} already available"
+        else
+          echo "📥 Fetching base branch origin/${BASE}..."
+          git fetch --no-tags --prune --depth=1 origin \
+            "+refs/heads/${BASE}:refs/remotes/origin/${BASE}"
+          echo "✅ Successfully fetched base branch origin/${BASE}"
+        fi
+
     - name: Run auto-docs action
       shell: bash
       env:
