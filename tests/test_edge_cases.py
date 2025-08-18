@@ -222,7 +222,10 @@ def test_main_with_no_changed_files():
             os.system('git config user.name "Test User"')
 
             # Should exit cleanly with no files to process
-            with patch("git_operations.get_changed_py_files", return_value=[]):
+            with (
+                patch("git_operations.get_changed_py_files", return_value=[]),
+                patch("shutil.which", return_value="/fake/claude"),
+            ):
                 exit_code = main.main()
                 assert exit_code == 0  # Success even with no files
 

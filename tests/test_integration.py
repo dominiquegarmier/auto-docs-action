@@ -63,7 +63,10 @@ class Calculator:
             os.environ["ANTHROPIC_API_KEY"] = "test-key"
 
             # Run main with mocked Claude CLI execution
-            with patch("docstring_updater._execute_claude_cli") as mock_claude:
+            with (
+                patch("docstring_updater._execute_claude_cli") as mock_claude,
+                patch("shutil.which", return_value="/fake/claude"),
+            ):
                 # Configure mock to simulate successful Claude execution that adds docstrings
                 def side_effect(prompt, file_path, claude_command):
                     # Simulate Claude adding docstrings to the file
