@@ -1,3 +1,6 @@
+[![Tests](https://github.com/dominiquegarmier/auto-docs-action/actions/workflows/test.yml/badge.svg)](https://github.com/dominiquegarmier/auto-docs-action/actions/workflows/test.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/dominiquegarmier/auto-docs-action/main.svg)](https://results.pre-commit.ci/latest/github/dominiquegarmier/auto-docs-action/main)
+
 # Auto-Docs Action
 
 Automatically update Python docstrings using Claude Code CLI. This GitHub Action detects changed Python files and adds comprehensive Google-style docstrings to functions, classes, and methods that lack proper documentation.
