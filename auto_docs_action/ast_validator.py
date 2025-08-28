@@ -36,7 +36,7 @@ def validate_changes(original_content: str, current_file_path: Path) -> Validati
         original_ast = ast.parse(original_content)
         current_ast = ast.parse(current_content)
 
-        # Extract function/class structures (without docstrings)
+        # Extract complete code structures (without docstrings)
         original_structure = _extract_code_structure(original_ast)
         current_structure = _extract_code_structure(current_ast)
 
@@ -59,184 +59,79 @@ def validate_changes(original_content: str, current_file_path: Path) -> Validati
         return ValidationResult(passed=False, status="validation_error", reason=f"Validation failed: {e}")
 
 
-def _extract_code_structure(tree: ast.AST) -> dict[str, Any]:
-    """Extract function/class signatures and logic (excluding docstrings).
+def _extract_code_structure(tree: ast.AST) -> str:
+    """Extract complete code structure (excluding docstrings) using recursive AST walking.
+
+    This new approach walks the entire AST recursively and removes docstrings
+    from every scope (module, function, class), then serializes the remaining
+    structure for comparison.
 
     Args:
         tree: AST tree to analyze
 
     Returns:
-        Dictionary representing the code structure without docstrings
+        String representation of the code structure without docstrings
     """
-    structure: dict[str, Any] = {"imports": [], "functions": [], "classes": [], "module_level": []}
+    # Create a deep copy of the AST to avoid modifying the original
+    import copy
 
-    # Only process top-level nodes, not nested ones
-    # AST.body is only available on Module nodes
-    if not hasattr(tree, "body"):
-        return structure
+    tree_copy = copy.deepcopy(tree)
 
-    for node in tree.body:
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            structure["imports"].append(ast.dump(node))
-        elif isinstance(node, ast.FunctionDef):
-            func_info = {
-                "name": node.name,
-                "args": _serialize_args(node.args),
-                "returns": ast.dump(node.returns) if node.returns else None,
-                "decorators": [ast.dump(d) for d in node.decorator_list],
-                "body_without_docstring": _get_body_without_docstring(node.body),
-            }
-            structure["functions"].append(func_info)
-        elif isinstance(node, ast.ClassDef):
-            class_info = {
-                "name": node.name,
-                "bases": [ast.dump(base) for base in node.bases],
-                "decorators": [ast.dump(d) for d in node.decorator_list],
-                "methods": _extract_class_methods(node),
-                "body_without_docstring": _get_body_without_docstring(node.body),
-            }
-            structure["classes"].append(class_info)
-        else:
-            # Other module-level statements (assignments, etc.)
-            # Skip docstrings (handled by _get_body_without_docstring logic)
-            if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)):
-                structure["module_level"].append(ast.dump(node))
+    # Recursively remove docstrings from all scopes
+    _remove_docstrings_recursive(tree_copy)
 
-    return structure
+    # Return serialized structure
+    return ast.dump(tree_copy)
 
 
-def _serialize_args(args: ast.arguments) -> dict[str, Any]:
-    """Serialize function arguments for comparison."""
-    return {
-        "args": [arg.arg for arg in args.args],
-        "vararg": args.vararg.arg if args.vararg else None,
-        "kwonlyargs": [arg.arg for arg in args.kwonlyargs],
-        "kwarg": args.kwarg.arg if args.kwarg else None,
-        "defaults": [ast.dump(default) for default in args.defaults],
-        "kw_defaults": [ast.dump(default) if default else None for default in args.kw_defaults],
-    }
+def _remove_docstrings_recursive(node: ast.AST) -> None:
+    """Recursively remove docstrings from valid docstring scopes in the AST.
+
+    This function walks through the entire AST and removes the first statement
+    from scopes that can legally have docstrings (Module, FunctionDef,
+    AsyncFunctionDef, ClassDef) if it's a string literal.
+
+    String literals in other contexts (try, if, for, with, match, etc.) are
+    preserved as regular statements.
+
+    Args:
+        node: AST node to process (modified in-place)
+    """
+    # Only remove docstrings from scopes that can legally have them
+    if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        if hasattr(node, "body") and node.body:
+            # Check if first statement is a docstring
+            first_stmt = node.body[0]
+            if (
+                isinstance(first_stmt, ast.Expr)
+                and isinstance(first_stmt.value, ast.Constant)
+                and isinstance(first_stmt.value.value, str)
+            ):
+                # Remove the docstring
+                node.body = node.body[1:]
+
+    # Recursively process all child nodes
+    for child in ast.iter_child_nodes(node):
+        _remove_docstrings_recursive(child)
 
 
-def _get_body_without_docstring(body: list[ast.stmt]) -> list[str]:
-    """Get AST body excluding docstring statements."""
-    if not body:
-        return []
-
-    # Skip docstring (first statement if it's a string literal)
-    start_idx = 0
-    if (
-        len(body) > 0
-        and isinstance(body[0], ast.Expr)
-        and isinstance(body[0].value, ast.Constant)
-        and isinstance(body[0].value.value, str)
-    ):
-        start_idx = 1
-
-    return [ast.dump(stmt) for stmt in body[start_idx:]]
-
-
-def _extract_class_methods(class_node: ast.ClassDef) -> list[dict[str, Any]]:
-    """Extract method information from a class node."""
-    methods = []
-    for node in class_node.body:
-        if isinstance(node, ast.FunctionDef):
-            method_info = {
-                "name": node.name,
-                "args": _serialize_args(node.args),
-                "returns": ast.dump(node.returns) if node.returns else None,
-                "decorators": [ast.dump(d) for d in node.decorator_list],
-                "body_without_docstring": _get_body_without_docstring(node.body),
-            }
-            methods.append(method_info)
-    return methods
-
-
-def _structures_match(orig: dict[str, Any], curr: dict[str, Any]) -> bool:
+def _structures_match(orig_structure: str, curr_structure: str) -> bool:
     """Compare code structures ignoring docstrings.
 
     Args:
-        orig: Original structure
-        curr: Current structure
+        orig_structure: Original AST structure (serialized)
+        curr_structure: Current AST structure (serialized)
 
     Returns:
         True if structures match (only docstrings may differ)
     """
     try:
-        # Compare imports
-        if orig["imports"] != curr["imports"]:
-            logging.debug("Import statements differ")
-            return False
-
-        # Compare functions
-        if len(orig["functions"]) != len(curr["functions"]):
-            logging.debug("Number of functions differs")
-            return False
-
-        for orig_func, curr_func in zip(orig["functions"], curr["functions"]):
-            if not _functions_match(orig_func, curr_func):
-                logging.debug(f"Function {orig_func['name']} differs")
-                return False
-
-        # Compare classes
-        if len(orig["classes"]) != len(curr["classes"]):
-            logging.debug("Number of classes differs")
-            return False
-
-        for orig_class, curr_class in zip(orig["classes"], curr["classes"]):
-            if not _classes_match(orig_class, curr_class):
-                logging.debug(f"Class {orig_class['name']} differs")
-                return False
-
-        # Compare module-level code
-        if orig["module_level"] != curr["module_level"]:
-            logging.debug("Module-level code differs")
-            return False
-
-        return True
+        # Simple string comparison of the docstring-stripped AST structures
+        return orig_structure == curr_structure
 
     except Exception as e:
         logging.error(f"Error comparing structures: {e}")
         return False
-
-
-def _functions_match(orig: dict[str, Any], curr: dict[str, Any]) -> bool:
-    """Compare two function definitions."""
-    return bool(
-        orig.get("name") == curr.get("name")
-        and orig.get("args") == curr.get("args")
-        and orig.get("returns") == curr.get("returns")
-        and orig.get("decorators") == curr.get("decorators")
-        and orig.get("body_without_docstring") == curr.get("body_without_docstring")
-    )
-
-
-def _classes_match(orig: dict[str, Any], curr: dict[str, Any]) -> bool:
-    """Compare two class definitions."""
-    # Check basic class properties
-    if orig["name"] != curr["name"] or orig["bases"] != curr["bases"] or orig["decorators"] != curr["decorators"]:
-        return False
-
-    # Compare methods individually (allows docstring changes)
-    if len(orig["methods"]) != len(curr["methods"]):
-        return False
-
-    for orig_method, curr_method in zip(orig["methods"], curr["methods"]):
-        if not _functions_match(orig_method, curr_method):
-            return False
-
-    # Compare non-method class body statements (excluding docstrings and methods)
-    orig_non_method_body = _get_class_non_method_body(orig)
-    curr_non_method_body = _get_class_non_method_body(curr)
-
-    return orig_non_method_body == curr_non_method_body
-
-
-def _get_class_non_method_body(class_info: dict[str, Any]) -> list[str]:
-    """Get class body statements excluding methods and docstrings."""
-    # For now, just return empty list since we store the body as strings
-    # but methods are extracted separately. This could be enhanced later
-    # if needed for class-level statements like class variables.
-    return []
 
 
 def _compare_docstrings(orig_ast: ast.AST, curr_ast: ast.AST) -> list[dict[str, Any]]:
@@ -258,8 +153,8 @@ def _compare_docstrings(orig_ast: ast.AST, curr_ast: ast.AST) -> list[dict[str, 
         changes.append({"type": "module", "name": "__module__", "original": orig_module_doc, "current": curr_module_doc})
 
     # Compare function docstrings
-    orig_functions = {f.name: f for f in ast.walk(orig_ast) if isinstance(f, ast.FunctionDef)}
-    curr_functions = {f.name: f for f in ast.walk(curr_ast) if isinstance(f, ast.FunctionDef)}
+    orig_functions = {f.name: f for f in ast.walk(orig_ast) if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    curr_functions = {f.name: f for f in ast.walk(curr_ast) if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef))}
 
     for func_name in set(orig_functions.keys()) | set(curr_functions.keys()):
         orig_doc = _get_docstring(orig_functions.get(func_name)) if func_name in orig_functions else None
