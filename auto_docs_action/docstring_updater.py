@@ -32,6 +32,11 @@ REQUIREMENTS - MUST FOLLOW EXACTLY:
 IMPORTANT: You must add docstrings to ALL functions/classes/methods in the file that don't have them, \
 regardless of whether they appear in the git diff or not. The diff is just context for why this file needs updates.
 
+IMPORTANT:
+- NEVER ADD MULTIPLE DOCSTRINGS to a single function/class/method/module, it must always be at the top
+(in the case of modules, at the top below any shebang or encoding lines).
+- NEVER USE DOCSTRINGS AS MULTI-LINE COMMENTS. Docstrings must be placed correctly and only once in the right location.
+
 Use the Edit tool to make the changes directly to {file_path}. Add comprehensive documentation to improve code quality."""
 
 
