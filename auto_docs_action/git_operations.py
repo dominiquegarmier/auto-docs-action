@@ -306,6 +306,51 @@ def restore_file(file_path: Path) -> bool:
         return False
 
 
+def run_pre_commit_hook(hook_command: str) -> bool:
+    """Run pre-commit hook command if provided.
+
+    Args:
+        hook_command: Command to run before committing
+
+    Returns:
+        True if hook ran successfully or no hook provided, False on failure
+    """
+    if not hook_command or hook_command.strip() == "":
+        logging.debug("No pre-commit hook configured")
+        return True
+
+    try:
+        logging.info(f"🪝 Running pre-commit hook: {hook_command}")
+        result = subprocess.run(
+            hook_command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minute timeout
+        )
+
+        logging.info(f"Pre-commit hook exit code: {result.returncode}")
+        if result.stdout:
+            logging.info(f"Pre-commit stdout:\n{result.stdout}")
+        if result.stderr:
+            logging.info(f"Pre-commit stderr:\n{result.stderr}")
+
+        if result.returncode == 0:
+            logging.info("✅ Pre-commit hook completed successfully")
+            return True
+        else:
+            logging.warning(f"⚠️  Pre-commit hook exited with code {result.returncode}, continuing anyway...")
+            # Return True to not block commits even if pre-commit fails
+            return True
+
+    except subprocess.TimeoutExpired:
+        logging.error("❌ Pre-commit hook timed out after 5 minutes")
+        return False
+    except Exception as e:
+        logging.error(f"❌ Failed to run pre-commit hook: {e}")
+        return False
+
+
 def create_commit(message: str) -> bool:
     """Create commit with staged files.
 

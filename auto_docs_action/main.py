@@ -126,6 +126,14 @@ def _main_impl(claude_command: str | None, max_retries: int | None, retry_delay:
             logger.error(f"❌ Failed to calculate statistics: {e}", exc_info=True)
             return 1
 
+        # Run pre-commit hook if configured
+        pre_commit_hook = os.getenv("PRE_COMMIT_HOOK", "").strip()
+        if pre_commit_hook:
+            logger.info("Running pre-commit hook before staging...")
+            if not git_operations.run_pre_commit_hook(pre_commit_hook):
+                logger.error("Pre-commit hook failed critically (timeout or exception)")
+                return 1
+
         # Stage successful changes
         logger.info("📝 Staging successful changes...")
         staged_any = False

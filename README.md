@@ -59,6 +59,18 @@ jobs:
           max_retries: 2
 ```
 
+### With Pre-commit Hooks
+
+To run pre-commit hooks before committing (e.g., formatters, linters):
+
+```yaml
+      - name: Auto-update docstrings
+        uses: dominiquegarmier/auto-docs-action@main
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          pre_commit_hook: "uv add pre-commit && pre-commit run --all-files"
+```
+
 ## Setup
 
 1. Get an Anthropic API key at [console.anthropic.com](https://console.anthropic.com)
@@ -70,11 +82,12 @@ jobs:
 
 ### Inputs
 
-| Input               | Description                            | Required | Default  |
-| ------------------- | -------------------------------------- | -------- | -------- |
-| `anthropic_api_key` | Your Anthropic API key for Claude Code | Yes      | -        |
-| `max_retries`       | Maximum retry attempts per file        | No       | `2`      |
-| `claude_command`    | Path to Claude Code CLI executable     | No       | `claude` |
+| Input               | Description                              | Required | Default  |
+| ------------------- | ---------------------------------------- | -------- | -------- |
+| `anthropic_api_key` | Your Anthropic API key for Claude Code   | Yes      | -        |
+| `max_retries`       | Maximum retry attempts per file          | No       | `2`      |
+| `claude_command`    | Path to Claude Code CLI executable       | No       | `claude` |
+| `pre_commit_hook`   | Command to run before committing changes | No       | -        |
 
 ### Outputs
 
@@ -90,9 +103,10 @@ jobs:
 2. Generates git diff for each file to understand what changed
 3. Sends files to Claude Code CLI with context-aware prompts
 4. Validates changes using AST parsing to ensure only docstrings were modified
-5. Creates commit with updated docstrings and pushes back to repository
-6. For pull requests, automatically pushes updates to PR branch (like pre-commit.ci)
-7. Automatically ensures PR base branches are available for accurate diff detection
+5. Optionally runs pre-commit hooks before committing (if configured)
+6. Creates commit with updated docstrings and pushes back to repository
+7. For pull requests, automatically pushes updates to PR branch (like pre-commit.ci)
+8. Automatically ensures PR base branches are available for accurate diff detection
 
 ### First Run
 
@@ -104,6 +118,16 @@ On the first run, the action processes all Python files to establish a baseline 
 - Pull requests: Compares against PR base commit or last bot commit (whichever has less history)
 - Handles multiple commits between runs
 - Automatically fetches PR base branches when needed
+
+### Pre-commit Hook Support
+
+The `pre_commit_hook` input allows you to run any command before the action commits changes. This is useful for:
+- Running code formatters (black, isort, etc.)
+- Running linters (flake8, pylint, etc.)
+- Running pre-commit hooks if your project uses them
+- Any custom validation or formatting
+
+The hook command runs after docstrings are updated but before changes are committed. If the hook fails with a non-zero exit code, the changes are still committed (similar to how pre-commit.ci works). Hook output is logged for debugging.
 
 ## Example
 

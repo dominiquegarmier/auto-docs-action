@@ -18,6 +18,10 @@ inputs:
     description: 'Path to Claude Code CLI executable'
     required: false
     default: 'claude'
+  pre_commit_hook:
+    description: 'Command to run before committing changes (e.g., "uv install pre-commit && pre-commit run --all-files")'
+    required: false
+    default: ''
 
 outputs:
   files_processed:
@@ -86,6 +90,7 @@ runs:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
         CLAUDE_COMMAND: ${{ inputs.claude_command }}
         MAX_RETRIES: ${{ inputs.max_retries }}
+        PRE_COMMIT_HOOK: ${{ inputs.pre_commit_hook }}
       run: |
         # Run the action in the target repository directory
         cd $GITHUB_WORKSPACE
